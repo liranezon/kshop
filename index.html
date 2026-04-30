@@ -1,0 +1,2442 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>K-Shop – ניהול מלאי</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; background: #f8fafc; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    input[type="file"]::file-selector-button {
+      background: #6366f1; color: white; border: none;
+      padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    }
+    input[type="file"]::file-selector-button:hover { background: #4f46e5; }
+
+    /* ── Print / PDF styles ────────────────────── */
+    @media print {
+      body > #root       { display: none !important; }
+      body > #kshop-print-catalog { display: block !important; }
+      /* margin:0 removes browser default header/footer lines (date, URL, title) */
+      @page { margin: 0; size: A4 portrait; }
+    }
+    #kshop-print-catalog { display: none; direction: rtl; }
+    #kshop-print-catalog * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+
+    /* ── inner wrapper (provides page margins) */
+    .pc-wrap { padding: 10mm 12mm 8mm; background: #fff; min-height: 100vh; }
+
+    /* ── header bar */
+    .pc-header {
+      background: #1a1a1a;
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      direction: ltr;          /* LTR so logo=left, title=right */
+      align-items: center;
+      justify-content: space-between;
+      border-radius: 8px 8px 0 0;
+      margin-bottom: 0;
+    }
+    /* logo on the LEFT (first child in LTR) */
+    .pc-logo-wrap { display: flex; align-items: center; gap: 10px; }
+    .pc-logo-img  { height: 44px; width: auto; }
+    /* fallback text logo */
+    .pc-logo-k    { font-size: 28px; font-weight: 900; color: #cc0000; line-height: 1; }
+    .pc-logo-s    { font-size: 20px; font-style: italic; font-weight: 700; color: #fff; line-height: 1; }
+    /* title on the RIGHT (second child in LTR = right side) */
+    .pc-header-title { text-align: right; direction: rtl; }
+    .pc-catalog-title { font-size: 14px; font-weight: 700; opacity: .92; }
+    .pc-catalog-date  { font-size: 10px; opacity: .5; margin-top: 3px; }
+
+    /* ── table */
+    .pc-table {
+      width: 100%;
+      border-collapse: collapse;
+      direction: rtl;
+      font-size: 12px;
+      margin-top: 0;
+    }
+    /* column headers — RED background */
+    .pc-table thead tr {
+      background: #cc0000;
+      color: #fff;
+    }
+    .pc-table thead th {
+      padding: 9px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: right;
+      border: none;
+    }
+    .pc-table thead th.col-img   { text-align: center; width: 72px; }
+    .pc-table thead th.col-price { text-align: center; width: 88px; }
+    /* category row */
+    .pc-cat-row td {
+      background: #cc0000;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 8px 14px;
+      text-align: right;
+    }
+    /* data rows — alternating white / light rose */
+    .pc-table tbody tr.pc-row { page-break-inside: avoid; }
+    .pc-table tbody tr.pc-row:nth-child(odd)  { background: #ffffff; }
+    .pc-table tbody tr.pc-row:nth-child(even) { background: #fce8e8; }
+    .pc-table tbody tr.pc-row td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #f5d0d0;
+      vertical-align: middle;
+      text-align: right;
+    }
+    /* image cell */
+    .pc-row-img {
+      width: 64px;
+      height: 48px;
+      object-fit: cover;
+      border-radius: 6px;
+      display: block;
+      margin: 0 auto;
+    }
+    .pc-row-img-placeholder {
+      width: 64px;
+      height: 48px;
+      background: #f0ede8;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      margin: 0 auto;
+    }
+    .pc-row-name  { font-weight: 700; color: #1a1a1a; font-size: 13px; }
+    .pc-row-dims  { font-size: 11px; color: #666; margin-top: 1px; }
+    /* price cell: ש"ח label + bold red number */
+    .pc-price-cell { text-align: center; }
+    .pc-price-label { font-size: 10px; color: #999; display: block; }
+    .pc-price-num   { font-size: 16px; font-weight: 900; color: #cc0000; display: block; line-height: 1.2; }
+    .pc-price-empty { color: #ccc; font-size: 11px; }
+
+    /* ── footer */
+    .pc-footer {
+      background: #1a1a1a;
+      color: #fff;
+      text-align: center;
+      padding: 9px;
+      font-size: 12px;
+      border-radius: 0 0 8px 8px;
+    }
+    .pc-footer strong { color: #cc0000; }
+  </style>
+</head>
+<body>
+  <!-- Hidden catalog for printing – filled dynamically before window.print() -->
+  <div id="kshop-print-catalog"></div>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ── Cloud Sync (Supabase) ────────────────────────────────
+    const SUPABASE_URL = 'https://vtrzxykuhacrlqzgdbfe.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0cnp4eWt1aGFjcmxxemdkYmZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MzYxMzcsImV4cCI6MjA5MjIxMjEzN30.oGuQKHmaMyiZOPvNyis637fMY8fOD5kQWSjjCLTozfQ';
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function cloudLoad() {
+      try {
+        const { data: prods, error: pErr } = await db
+          .from('products')
+          .select('*')
+          .order('display_order', { ascending: true });
+        if (pErr) throw pErr;
+
+        const { data: settings, error: sErr } = await db.from('app_settings').select('*');
+        if (sErr) throw sErr;
+
+        const cfg = {};
+        (settings || []).forEach(s => {
+          try { cfg[s.key] = JSON.parse(s.value); } catch { cfg[s.key] = s.value; }
+        });
+
+        return {
+          products:       prods || [],
+          categories:     cfg.categories     || [],
+          warehouses:     cfg.warehouses     || [],
+          whatsappNumber: cfg.whatsappNumber || '',
+          serverURL:      cfg.serverURL      || '',
+          logoUrl:        cfg.logoUrl        || ''
+        };
+      } catch(e) {
+        console.error('cloudLoad error:', e.message);
+        throw e;
+      }
+    }
+
+    async function cloudSave(data) {
+      // אל תשמור לפני שהטעינה מהענן הסתיימה — מונע דריסת נתוני ענן בנתוני localStorage ישנים
+      if (!cloudDataLoaded) {
+        console.warn('cloudSave: נחסם — טעינת ענן טרם הסתיימה');
+        return true;
+      }
+      // בדוק session — אם אין משתמש מחובר, אל תנסה לכתוב (RLS יחסום)
+      const { data: { session } } = await db.auth.getSession();
+      if (!session) {
+        console.warn('cloudSave: אין session מאומת — שמירה מקומית בלבד');
+        return true;
+      }
+
+      // שמירת מוצרים (upsert בלבד — מחיקה רק דרך cloudDeleteProduct)
+      if (data.products && data.products.length > 0) {
+        const withOrder = data.products.map((p, i) => ({ ...p, display_order: i }));
+        const { error: uErr } = await db.from('products').upsert(withOrder, { onConflict: 'id' });
+        if (uErr) throw uErr;
+      }
+
+      // שמירת הגדרות
+      const rows = [];
+      if (data.categories)               rows.push({ key: 'categories',      value: JSON.stringify(data.categories) });
+      if (data.warehouses)               rows.push({ key: 'warehouses',       value: JSON.stringify(data.warehouses) });
+      if (data.whatsappNumber !== undefined) rows.push({ key: 'whatsappNumber', value: JSON.stringify(data.whatsappNumber) });
+      if (data.logoUrl        !== undefined) rows.push({ key: 'logoUrl',        value: JSON.stringify(data.logoUrl) });
+      if (rows.length) {
+        const { error } = await db.from('app_settings').upsert(rows, { onConflict: 'key' });
+        if (error) throw error;
+      }
+      return true;
+    }
+
+    // ─────────────────────────────────────────
+    // Contacts CRUD
+    // ─────────────────────────────────────────
+    async function contactsLoad() {
+      try {
+        const { data } = await db.from('contacts').select('*').order('name');
+        return data || [];
+      } catch { return []; }
+    }
+    async function contactUpsert(contact) {
+      return db.from('contacts').upsert(contact, { onConflict: 'id' });
+    }
+    async function contactDelete(id) {
+      return db.from('contacts').delete().eq('id', id);
+    }
+
+    async function cloudDeleteProduct(id) {
+      const { data: { session } } = await db.auth.getSession();
+      if (!session) return;
+      await db.from('products').delete().eq('id', id);
+    }
+
+    let cloudSaveTimer = null;
+    let cloudDataLoaded = false; // מונע שמירה לפני שהטעינה מהענן הסתיימה
+
+    function debouncedCloudSave(products, categories) {
+      if (!cloudDataLoaded) {
+        console.warn('debouncedCloudSave: ממתין לטעינת ענן — נדחה');
+        return;
+      }
+      clearTimeout(cloudSaveTimer);
+      cloudSaveTimer = setTimeout(() => {
+        cloudSave({
+          products,
+          categories: categories || JSON.parse(localStorage.getItem('kshop_categories') || '[]'),
+          whatsappNumber: localStorage.getItem('kshop_whatsapp_number') || '972509933322'
+        });
+      }, 1500);
+    }
+
+    // ─────────────────────────────────────────
+    // קבועים
+    // ─────────────────────────────────────────
+    const CATEGORIES = [
+      { key: 'all',        label: 'הכל' },
+      { key: 'bounce',     label: 'מתנפחי קפיצות' },
+      { key: 'challenge',  label: 'אתגרונים' },
+      { key: 'waterslide', label: 'מגלשות מים' },
+      { key: 'gymboree',   label: 'מתחמי ג׳ימבורי' },
+      { key: 'character',  label: 'מייצגים' },
+      { key: 'pool',       label: 'בריכות' },
+      { key: 'sport',      label: 'ספורט' },
+      { key: 'carnival',   label: 'קרנבל וקליעה' },
+      { key: 'arch',       label: 'שערי כניסה' },
+    ];
+
+    const DEFAULT_WAREHOUSES = [
+      { key: 'alishma_old', label: 'אלישמע ישן' },
+      { key: 'alishma_new', label: 'אלישמע חדש' },
+    ];
+
+    // helper: parse warehouse_qty (string or object) → plain object
+    const getWqty = (p) => {
+      if (!p || !p.warehouse_qty) return {};
+      if (typeof p.warehouse_qty === 'object') return p.warehouse_qty;
+      try { return JSON.parse(p.warehouse_qty); } catch { return {}; }
+    };
+
+    const STORAGE_KEY   = 'kshop_products_v1';
+
+    // ─────────────────────────────────────────
+    // נתוני מוצרים מהאתר (seed)
+    // ─────────────────────────────────────────
+    const SEED_PRODUCTS = [{"id": "1", "name": "מתנפח קרניבל 4 תחנות", "category": "carnival", "dimensions": "אורך: 6 עומק: 2.4 גובה: 3.7", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-19-11.04.00.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "2", "name": "מתנפח קליעה למטרה כדורגל", "category": "sport", "dimensions": "אורך:2.4 עומק: 2.1 גובה: 2.4", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/מתנפח-קליעה-למטרה.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "3", "name": "שער כניסה לבת מצווה", "category": "arch", "dimensions": "רוחב: 6 מ גובה: 4.8", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/שער-כניסה-לבת-מצווה.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "4", "name": "מתנפח באולינג 2 מסלולים", "category": "sport", "dimensions": "אורך: 5 רוחב: 3 גובה: 1.42", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/באולינג-ענק.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "5", "name": "מתנפח WHACK A WALL", "category": "bounce", "dimensions": "אורך: 4 עומק: 1.5 גובה: 2.05", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-21-09.11.49.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "6", "name": "מתנפח פינגווין כדורים", "category": "carnival", "dimensions": "אורך: 3.60 עומק: 1.50 גובה: 2.70", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/IMG_7901.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "7", "name": "10 תחנות לונה ספורט", "category": "carnival", "dimensions": "כל ביתן זוגי: רוחב: 1.20 גובה: 2.10", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-21-09.16.49.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "8", "name": "ביתני קליעה מתנפחים", "category": "carnival", "dimensions": "כל ביתן: רוחב: 1.50 עומק: 2", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-21-09.11.09.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "9", "name": "מתנפח איקס עיגול משולב", "category": "carnival", "dimensions": "אורך: 2.5 עומק: 1.8 גובה: 3.30", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-04-29-11.41.04.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "10", "name": "מתנפח גרזנים Viking", "category": "carnival", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-04-29-11.47.09-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "11", "name": "מתנפח קליעה Viking זוגי", "category": "carnival", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/WhatsApp-Image-2022-08-22-at-17.52.20-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "12", "name": "מתנפח שער כדורגל", "category": "sport", "dimensions": "אורך: 4 עומק: 2 גובה: 2.5", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-19-11.05.42.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "13", "name": "מתנפח ביליארד רגל", "category": "sport", "dimensions": "אורך: 7.8 רוחב: 4.8 גובה: 0.45", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-19-18.27.52.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "14", "name": "מתנפח כדורסל אנושי", "category": "sport", "dimensions": "קוטר: 1.5 גובה: 3", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-12-13.26.53.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "15", "name": "מתנפח קרניבל 3 תחנות", "category": "carnival", "dimensions": "אורך: 5.8 עומק: 2.24 גובה: 2.87", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-19-18.21.44-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "16", "name": "מתנפח קרניבל 5 תחנות", "category": "carnival", "dimensions": "קוטר: 4.5 גובה: 4", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-04-29-11.51.55-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "17", "name": "מתנפח מתחם לגו ענק 5/5 ללא רצפה", "category": "gymboree", "dimensions": "אורך: 5 רוחב: 5 גובה: 2.54", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-18-09.10.55.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "18", "name": "מתנפח דרבי סוסים", "category": "sport", "dimensions": "אורך: 6 רוחב: 4.5 גובה: 2.85", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-21-09.12.23.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "19", "name": "מתנפח כדורסל SUPER STAR", "category": "sport", "dimensions": "אורך: 4 עומק: 3.5 גובה: 3.35", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-21-09.13.09.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "20", "name": "מתנפח הכדורים המעופפים", "category": "carnival", "dimensions": "אורך: 3 עומק: 1.48 גובה: 2.10", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-18-09.11.35.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "21", "name": "שער כניסה HAPPY BIRTHDAY", "category": "arch", "dimensions": "רוחב: 2.5 מ גובה: 2.5 קוטר: 0.30", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-19-18.22.25.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "22", "name": "בובת דנסר 2 רגליים", "category": "arch", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-21-09.13.37.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "23", "name": "בובת דנסר", "category": "arch", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-21-09.15.25.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "24", "name": "מתנפח קליעה זומבי", "category": "sport", "dimensions": "רוחב: 2.40 עומק: 3 גובה: 2.75", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-21-09.16.44.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "25", "name": "רשת כדור עף לבריכה", "category": "pool", "dimensions": "רוחב:3 מטר גובה: 1 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2017-08-11-09.18.58.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "26", "name": "חליפות סומו מבוגר", "category": "sport", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-21-09.18.17.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "27", "name": "חליפות סומו ילדים", "category": "challenge", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-21-09.18.26.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "28", "name": "מתנפח מסלול מכונית / קארטינג", "category": "sport", "dimensions": "אורך: 12 עומק: 6", "image": "https://k-shop.co.il/wp-content/uploads/2021/12/2021-12-05-10.05.51.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "29", "name": "מתנפח כדורגל SUPER TARGET", "category": "sport", "dimensions": "אורך:4 עומק: 2.5 גובה: 3.6", "image": "https://k-shop.co.il/wp-content/uploads/2021/12/2021-12-05-10.06.21.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "30", "name": "מתנפח כדורסל WINNER", "category": "sport", "dimensions": "אורך: 4 עומק: 3 גובה: 2.5", "image": "https://k-shop.co.il/wp-content/uploads/2021/12/2021-12-05-10.06.07.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "31", "name": "מתנפח קקטוס טבעות", "category": "carnival", "dimensions": "אורך: 3 עומק: 1.5 גובה: 1.80", "image": "https://k-shop.co.il/wp-content/uploads/2021/12/2021-12-05-09.56.38.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "32", "name": "מתנפח כדורגל אנושי", "category": "sport", "dimensions": "אורך: 10 עומק: 5 גובה: 1.3", "image": "https://k-shop.co.il/wp-content/uploads/2021/12/כדורגל-אנושי.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "33", "name": "מתנפח חץ וקשת כדורים", "category": "challenge", "dimensions": "אורך: 3 עומק: 2 גובה: 2.5", "image": "https://k-shop.co.il/wp-content/uploads/2021/12/2021-12-05-09.54.37.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "34", "name": "מתנפח טירת קפיצות WEDDING", "category": "bounce", "dimensions": "אורך: 3.65 עומק: 3.65 גובה: 4", "image": "https://k-shop.co.il/wp-content/uploads/2022/01/Killer_20combo_20-_20bounce_20house_20_20balloons.webp_large.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "35", "name": "כדורי Bubbel Soccer מתנפחים", "category": "sport", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2022/01/Diam-1-5m-1-2m-Giant-Inflatable-Human-Bumper-Bubble-Soccer-Ball-Sumo-Suit-Blow-Up.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "36", "name": "מתנפח מיטת צעצועים חיות", "category": "bounce", "dimensions": "אורך: 5 עומק: 4 גובה: 1.90", "image": "https://k-shop.co.il/wp-content/uploads/2022/01/2021-12-05-10.05.29-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "37", "name": "מתנפח טירת קפיצות ג'ירפה", "category": "bounce", "dimensions": "אורך: 4.5 עומק: 4.5 גובה: 4.56", "image": "https://k-shop.co.il/wp-content/uploads/2022/01/2021-12-05-10.02.45.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "38", "name": "מתנפח השחלת טבעות", "category": "carnival", "dimensions": "אורך: 3 עומק: 1.5 גובה: 1.32", "image": "https://k-shop.co.il/wp-content/uploads/2022/04/IMG_3727-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "39", "name": "מתנפח כדורים מרחפים", "category": "carnival", "dimensions": "אורך: 5 עומק: 1.92 גובה: 1.68", "image": "https://k-shop.co.il/wp-content/uploads/2022/04/2022-04-03-10.17.30.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "40", "name": "בריכה חד קרן עם שסתום", "category": "pool", "dimensions": "אורך: 5 רוחב: 4 גובה: 0.50 גובה סופי: 2.10", "image": "https://k-shop.co.il/wp-content/uploads/2022/04/2021-12-05-09.56.05-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "41", "name": "בריכת חד קרן", "category": "pool", "dimensions": "אורך: 5 רוחב: 4 גובה: 0.50 גובה סופי: 2.10", "image": "https://k-shop.co.il/wp-content/uploads/2022/04/2021-12-05-09.56.05-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "42", "name": "בריכת מים 4/4", "category": "pool", "dimensions": "אורך: 4 רוחב: 4 גובה: 0.48", "image": "https://k-shop.co.il/wp-content/uploads/2022/04/בריכה-5-5-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "43", "name": "בריכת מים 6/6", "category": "pool", "dimensions": "אורך: 6 רוחב: 6 גובה: 0.48", "image": "https://k-shop.co.il/wp-content/uploads/2022/04/בריכה-5-5-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "44", "name": "בריכת מים 8/8", "category": "pool", "dimensions": "אורך: 8 רוחב: 8 גובה: 0.48", "image": "https://k-shop.co.il/wp-content/uploads/2022/04/בריכה-8-8-1-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "45", "name": "מתנפח טירת קפיצות חד קרן", "category": "bounce", "dimensions": "אורך: 4.5 עומק: 4.5 גובה: 5.10", "image": "https://k-shop.co.il/wp-content/uploads/2022/06/טירת-קפיצות-חד-קרן.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "46", "name": "מגרש כדורעף צף לבריכה", "category": "pool", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2022/07/WhatsApp-Image-2022-07-27-at-13.07.24.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "47", "name": "בריכת כדורים דינוזאורים", "category": "gymboree", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2022/07/WhatsApp-Image-2022-07-28-at-17.13.54.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "48", "name": "בריכת כדורים קרקס", "category": "gymboree", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2022/07/WhatsApp-Image-2022-07-28-at-17.13.54-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "49", "name": "מגרש כדורגל / כדורעף / כדורסל משולב", "category": "sport", "dimensions": "אורך:12 מטר רוחב: 6 מטר גובה: 3 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2022/07/WhatsApp-Image-2022-07-31-at-10.09.07.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "50", "name": "מתנפח כדורסל 4 בשורה", "category": "sport", "dimensions": "אורך:2.74 מטר עומק: 3.66 מטר גובה: 3.66 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2022/07/WhatsApp-Image-2022-07-31-at-10.24.49.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "51", "name": "מתנפח תא דולרים", "category": "challenge", "dimensions": "רוחב: 1.80 גובה 2.50", "image": "https://k-shop.co.il/wp-content/uploads/2022/08/WhatsApp-Image-2022-08-22-at-17.53.14.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "52", "name": "תחנות משחק מתנפחות קונספט ספארי", "category": "carnival", "dimensions": "כל ביתן: רוחב: 1.50 עומק: 2 גובה:2.60", "image": "https://k-shop.co.il/wp-content/uploads/2022/09/ספארי-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "53", "name": "מתנפח כדורגל גול הזהב", "category": "sport", "dimensions": "אורך: 3.5 עומק: 3.5 גובה: 2.5", "image": "https://k-shop.co.il/wp-content/uploads/2022/09/גול-הזהב-01.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "54", "name": "מתנפח לימבו", "category": "challenge", "dimensions": "אורך: 3.5 עומק: 1.5 גובה: 3.4", "image": "https://k-shop.co.il/wp-content/uploads/2022/09/לימבו-2.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "55", "name": "מתנפח מבוך 8/8", "category": "challenge", "dimensions": "אורך: 8 עומק: 8 גובה: 2.16", "image": "https://k-shop.co.il/wp-content/uploads/2022/09/מבוך-מתנפח-5.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "56", "name": "מתנפח ויקינג זוגי Hammer", "category": "carnival", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2022/10/WhatsApp-Image-2022-10-20-at-16.50.50.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "57", "name": "מתנפח קרניבל 2 תחנות", "category": "carnival", "dimensions": "אורך: 3 עומק: 2.4 גובה: 3.4", "image": "https://k-shop.co.il/wp-content/uploads/2022/10/WhatsApp-Image-2022-10-26-at-19.24.02-1-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "58", "name": "מתנפח אוהל קרקס 5 תחנות", "category": "carnival", "dimensions": "קוטר: 6 גובה: 5.75", "image": "https://k-shop.co.il/wp-content/uploads/2022/10/2022-04-14-09.45.22-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "59", "name": "מתנפח מתחם לגו ענק 4/4 ללא רצפה", "category": "gymboree", "dimensions": "אורך: 4 רוחב: 4 גובה: 2.54", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-18-09.10.55.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "60", "name": "מתנפח מתחם לגו ענק 3/4 ללא רצפה", "category": "gymboree", "dimensions": "אורך: 4 רוחב: 3 גובה: 2.54", "image": "https://k-shop.co.il/wp-content/uploads/2022/10/2022-10-29-12.17.32-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "61", "name": "מתנפח מתחם לגו ענק 3/4 כולל רצפה", "category": "gymboree", "dimensions": "אורך: 4 רוחב: 3 גובה: 2.54", "image": "https://k-shop.co.il/wp-content/uploads/2022/10/2022-10-29-12.17.03-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "62", "name": "מתנפח מתחם לגו ענק 4/4 כולל רצפה", "category": "gymboree", "dimensions": "אורך: 4 רוחב: 4 גובה: 2.54", "image": "https://k-shop.co.il/wp-content/uploads/2022/10/2022-10-29-12.19.27-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "63", "name": "מתנפח מתחם לגו ענק 6/4 לא כולל רצפה", "category": "gymboree", "dimensions": "אורך: 6 רוחב: 4 גובה: 2.54", "image": "https://k-shop.co.il/wp-content/uploads/2022/10/2022-10-29-12.19.08-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "64", "name": "מתנפח ספורט משולב", "category": "sport", "dimensions": "אורך: 3.90 עומק: 3 גובה: 3.90", "image": "https://k-shop.co.il/wp-content/uploads/2022/10/WhatsApp-Image-2022-10-29-at-21.40.56.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "65", "name": "מתנפח מסלול מכונית / קארטינג RIDERS", "category": "sport", "dimensions": "אורך: 12 עומק: 6", "image": "https://k-shop.co.il/wp-content/uploads/2022/11/2022-04-28-00.25.31.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "66", "name": "מתנפח כדורגל סטנגה משולב כדורסל 6 משתתפים", "category": "sport", "dimensions": "פנימי 6 קוטר", "image": "https://k-shop.co.il/wp-content/uploads/2022/12/WhatsApp-Image-2022-12-27-at-17.26.27-1-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "67", "name": "שער כניסה מתנפח", "category": "arch", "dimensions": "אורך: 6 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2022/12/WhatsApp-Image-2022-12-28-at-08.54.15.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "68", "name": "מתנפח כדורסל 8 סלים Multiplayer", "category": "sport", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2023/01/WhatsApp_Image_2024-01-02_at_11.13.01-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "69", "name": "מתנפח אתגרון SAFARI משולב מגלשה", "category": "challenge", "dimensions": "אורך: 9 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2023/01/WhatsApp-Image-2023-01-04-at-16.42.09.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "70", "name": "מגלשת מים VOLCANO", "category": "waterslide", "dimensions": "אורך: 7 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2023/01/מגלשת-מים.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "71", "name": "מגלשת מים VOLCANO (העתק)", "category": "waterslide", "dimensions": "אורך: 7 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2023/01/מגלשת-מים.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "72", "name": "מתנפח כדורסל 3 סלים", "category": "sport", "dimensions": "רוחב: 4 עומק: 3 גובה: 4", "image": "https://k-shop.co.il/wp-content/uploads/2022/10/WhatsApp-Image-2023-01-31-at-12.33.06.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "73", "name": "מתנפח כדורסל 2 סלים", "category": "sport", "dimensions": "רוחב: 3 עומק: 4 גובה: 4.20", "image": "https://k-shop.co.il/wp-content/uploads/2023/02/WhatsApp-Image-2023-01-31-at-12.34.33.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "74", "name": "מתנפח מגלשת ליצן", "category": "waterslide", "dimensions": "אורך: 6 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2023/03/מגלשת-ליצן-2.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "75", "name": "מתנפח קפיצות ספארי משולב מגלשה", "category": "waterslide", "dimensions": "רוחב: 5 עומק: 4 גובה: 3.3", "image": "https://k-shop.co.il/wp-content/uploads/2023/03/WhatsApp_Image_2023-03-16_at_10.12.06-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "76", "name": "שער כניסה מעוצב קשת בענן", "category": "arch", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2023/03/שער-קשת-בענן-1.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "77", "name": "מתנפח הישרדות ל-4 משתתפים", "category": "challenge", "dimensions": "רוחב: 6.5 עומק: 6.5 גובה: 4", "image": "https://k-shop.co.il/wp-content/uploads/2023/05/WhatsApp_Image_2023-05-07_at_13.51.41-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "78", "name": "מתנפח הפל אותי", "category": "challenge", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2023/05/WhatsApp_Image_2023-05-07_at_13.53.00__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "79", "name": "סטנד איכותי לרמקול", "category": "bounce", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2023/05/04105-SS10-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "80", "name": "מתנפח אתגרון פיראטים משולב מגלשה", "category": "waterslide", "dimensions": "אורך: 7 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2023/05/WhatsApp_Image_2023-05-14_at_11.35.20-removebg-preview-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "81", "name": "מתנפח קרניבל 4 תחנות בסגנון קומיקס", "category": "carnival", "dimensions": "אורך: 6 עומק: 2.4 גובה: 3.7", "image": "https://k-shop.co.il/wp-content/uploads/2023/05/WhatsApp_Image_2023-05-23_at_16.35.48-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "82", "name": "מתנפח מתחם לגו ענק 5/4 כולל רצפה", "category": "gymboree", "dimensions": "אורך: 5 רוחב: 4 גובה: 2.54", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-18-09.10.55.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "83", "name": "בריכת מים 7/7", "category": "pool", "dimensions": "אורך: 7 רוחב: 7 גובה: 0.48", "image": "https://k-shop.co.il/wp-content/uploads/2022/04/בריכה-8-8-1-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "84", "name": "בריכת מים 5/5", "category": "pool", "dimensions": "אורך: 5 רוחב: 5 גובה: 0.48", "image": "https://k-shop.co.il/wp-content/uploads/2022/04/בריכה-5-5-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "85", "name": "מתנפח ג׳ימבורי ממתקים 5/5 כולל רצפה", "category": "gymboree", "dimensions": "אורך: 5 רוחב: 5", "image": "https://k-shop.co.il/wp-content/uploads/2023/10/WhatsApp-Image-2023-10-16-at-06.57.20.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "86", "name": "מתנפח ג׳ימבורי דינוזאורים 5/5 כולל רצפה", "category": "gymboree", "dimensions": "אורך: 5 רוחב: 5", "image": "https://k-shop.co.il/wp-content/uploads/2023/10/WhatsApp-Image-2023-10-16-at-06.59.09-2.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "87", "name": "מתנפח בייסבול", "category": "sport", "dimensions": "אורך: 3 גובה: 3.5", "image": "https://k-shop.co.il/wp-content/uploads/2023/10/WhatsApp-Image-2023-10-16-at-06.59.47-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "88", "name": "סט 4 תחנות משחק", "category": "carnival", "dimensions": "כל ביתן: רוחב: 1.50 עומק: 2 גובה:2.60", "image": "https://k-shop.co.il/wp-content/uploads/2023/10/WhatsApp-Image-2023-10-16-at-07.02.23.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "89", "name": "מתנפח חנות ממתקים", "category": "arch", "dimensions": "רוחב: 4 גובה 2.65 עומק 1.30", "image": "https://k-shop.co.il/wp-content/uploads/2023/10/WhatsApp-Image-2023-10-16-at-07.19.34-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "90", "name": "מתנפח מסלול באולינג", "category": "sport", "dimensions": "אורך: 5 רוחב: 1.8 גובה: 1.42", "image": "https://k-shop.co.il/wp-content/uploads/2023/10/WhatsApp_Image_2023-10-26_at_12.22.49-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "91", "name": "מתנפח מולטי 6 תחנות ספורט", "category": "sport", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/01/WhatsApp-Image-2023-12-28-at-16.55.29.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "92", "name": "מתנפח מגלשת ממתקים", "category": "waterslide", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/01/WhatsApp_Image_2024-01-22_at_13.58.48-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "93", "name": "מתנפח קרניבל 4 תחנות בסגנון ממתקים", "category": "carnival", "dimensions": "אורך: 6 עומק: 2.4 גובה: 3.7", "image": "https://k-shop.co.il/wp-content/uploads/2024/02/מתנפח-יריד-3.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "94", "name": "מתנפח קפיצות קרקס משולב מגלשה", "category": "waterslide", "dimensions": "רוחב: 5 עומק: 4 גובה: 3.3", "image": "https://k-shop.co.il/wp-content/uploads/2024/02/WhatsApp_Image_2024-02-08_at_17.18.48-removebg-preview.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "95", "name": "מתנפחי הסוואה ללייזר קווסט", "category": "sport", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/02/WhatsApp_Image_2024-02-11_at_18.45.47-removebg-preview-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "96", "name": "מסך הקרנה 6/4", "category": "arch", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/02/WhatsApp_Image_2024-02-13_at_08.58.11-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "97", "name": "מתנפח מתחם לגו ענק 5/5 כולל רצפה", "category": "gymboree", "dimensions": "אורך: 5 רוחב: 5 גובה: 2.54", "image": "https://k-shop.co.il/wp-content/uploads/2021/07/2021-06-18-09.10.55.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "98", "name": "מגלשת מים דולפין", "category": "waterslide", "dimensions": "אורך 7 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2024/02/WhatsApp_Image_2024-02-25_at_13.33.46-removebg-preview-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "99", "name": "מתנפח כדורגל מים", "category": "sport", "dimensions": "אורך: 10 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2024/04/WhatsApp-Image-2024-04-18-at-09.04.26.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "100", "name": "מתנפח קרניבל 3 תחנות קרקס", "category": "carnival", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/05/WhatsApp_Image_2024-04-30_at_09.18.25__3_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "101", "name": "מתנפח קרניבל Candy", "category": "carnival", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/05/WhatsApp_Image_2024-04-30_at_09.24.56-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "102", "name": "מתנפח מתחם לגו ענק 6/4 כולל רצפה", "category": "gymboree", "dimensions": "אורך: 6 רוחב: 4 גובה: 2.54", "image": "https://k-shop.co.il/wp-content/uploads/2022/10/2022-10-29-12.19.08-scaled.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "103", "name": "מתנפח מפלצות טבעות", "category": "carnival", "dimensions": "אורך: 3 עומק: 1.5 גובה: 1.80", "image": "https://k-shop.co.il/wp-content/uploads/2024/05/WhatsApp_Image_2024-05-05_at_09.43.50-removebg-preview-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "104", "name": "מתנפח קפיצות גלגל ענק", "category": "bounce", "dimensions": "אורך 4.5 רוחב 4.5 גובה 4", "image": "https://k-shop.co.il/wp-content/uploads/2024/05/WhatsApp_Image_2024-05-01_at_09.03.53-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "105", "name": "בובת ליצן מתנפחת פסים", "category": "character", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/07/ליצן-פסים.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "106", "name": "בובת ליצן מתנפחת משבצות", "category": "character", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/07/בובות-ליצן-מתנפחת.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "107", "name": "בובת ליצן הפוך מתנפחת סגול", "category": "character", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/07/בובה-מתנפחת-ליצן-הפוך.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "108", "name": "בובת ליצן הפוך מתנפחת אדום", "category": "character", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/07/בובה-מתנפחת-ליצן-הפוך-אדום.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "109", "name": "שער כניסה ממתקים (4 מטר) / CANDY", "category": "arch", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/07/שער-כניסה-ממתקים-1.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "110", "name": "שער כניסה ממתקים (5 מטר) / CANDY", "category": "arch", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/07/שער-כניסה-ממתקים-1.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "111", "name": "מתנפח Golden Ticket קרקס", "category": "carnival", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/07/WhatsApp_Image_2024-07-02_at_18.24.31__4_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "112", "name": "מגלשת מים דיסקו", "category": "waterslide", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/07/WhatsApp_Image_2024-07-28_at_12.45.38-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "113", "name": "מגלשת מים ממתקים", "category": "waterslide", "dimensions": "אורך 7 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2024/07/WhatsApp_Image_2024-07-29_at_09.46.06__5_-removebg-preview-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "114", "name": "מגלשת מים פיראטיים", "category": "waterslide", "dimensions": "אורך 7 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2024/07/WhatsApp_Image_2024-07-29_at_15.29.42-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "115", "name": "מתנפח חוות סוסים כולל 4 סוסי פוני על גלגלים", "category": "gymboree", "dimensions": "סוס M:", "image": "https://k-shop.co.il/wp-content/uploads/2024/09/WhatsApp_Image_2024-09-03_at_18.22.35-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "116", "name": "מתנפח מבוך ענק (10/20)", "category": "challenge", "dimensions": "אורך: 20 עומק: 10", "image": "https://k-shop.co.il/wp-content/uploads/2024/10/ללא-שם.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "117", "name": "מתנפח כדורסל SHOOT", "category": "sport", "dimensions": "3/1.5", "image": "https://k-shop.co.il/wp-content/uploads/2024/10/WhatsApp_Image_2024-10-29_at_15.23.58-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "118", "name": "מתנפח זריקת פריסבי", "category": "challenge", "dimensions": "3/1.5", "image": "https://k-shop.co.il/wp-content/uploads/2024/10/WhatsApp_Image_2024-10-29_at_14.36.45__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "119", "name": "מתנפח טירת קפיצות צבוענית", "category": "bounce", "dimensions": "אורך: 4 עומק: 4 גובה: 4", "image": "https://k-shop.co.il/wp-content/uploads/2024/10/WhatsApp_Image_2024-09-11_at_16.34.11-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "120", "name": "מתנפח קרניבל 3 תחנות צבעוני", "category": "carnival", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/10/WhatsApp_Image_2024-10-31_at_12.39.07-removebg-preview-1-e1735043820426-4.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "121", "name": "מתנפח יריד 360 בסגנון קרקס", "category": "carnival", "dimensions": "קוטר: 5 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp_Image_2024-12-16_at_18.44.18-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "122", "name": "מתנפח עמדת DJ Full Moon", "category": "arch", "dimensions": "רוחב: גובה:", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp_Image_2024-12-17_at_09.33.45-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "123", "name": "מתנפח ויקינג זוגי צבעוני", "category": "carnival", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp_Image_2024-12-12_at_18.36.00__4_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "124", "name": "מתנפח שער כדורגל ממתקים", "category": "sport", "dimensions": "אורך: 4 עומק: 2 גובה: 2.5", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp_Image_2024-12-12_at_18.36.00__8_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "125", "name": "מתנפח קליעה למטרה כדורגל ממתקים", "category": "sport", "dimensions": "אורך:2.4 עומק: 2.1 גובה: 2.4", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp_Image_2024-12-12_at_18.36.35-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "126", "name": "מגלשת מים קרנבל", "category": "waterslide", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp_Image_2024-12-12_at_18.36.00__17_-removebg-preview-1-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "127", "name": "מתנפח חדר דיסקו", "category": "bounce", "dimensions": "3.7X3.5", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp_Image_2024-12-12_at_18.36.00__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "128", "name": "מבוך לייזר קווסט 8/8", "category": "challenge", "dimensions": "אורך: 8 עומק: 8", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp-Image-2024-12-17-at-16.00.43-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "129", "name": "מתנפח מיטת צעצועים חלל", "category": "bounce", "dimensions": "אורך: 5 עומק: 4 גובה: 1.90", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp_Image_2024-12-22_at_10.53.00-removebg-preview-2.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "130", "name": "מתנפח טירת קפיצות חלל", "category": "bounce", "dimensions": "אורך: 4.5 עומק: 4.5 גובה: 4", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp_Image_2024-12-22_at_12.09.32-removebg-preview-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "131", "name": "מתנפח בועה", "category": "gymboree", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2024/12/WhatsApp_Image_2024-12-25_at_20.46.52-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "132", "name": "מתנפח קליעה רוגטקה", "category": "carnival", "dimensions": "רוחב: 1.80 עומק: 2.50 גובה: 2.90", "image": "https://k-shop.co.il/wp-content/uploads/2025/01/WhatsApp_Image_2025-01-21_at_10.30.43__3_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "133", "name": "מתנפח צבעוני טבעות", "category": "carnival", "dimensions": "אורך: 3 עומק: 1.5 גובה: 1.80", "image": "https://k-shop.co.il/wp-content/uploads/2025/02/WhatsApp_Image_2025-02-11_at_13.55.10__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "134", "name": "מתנפח שער כדורגל צבעוני", "category": "sport", "dimensions": "אורך: 4 עומק: 2 גובה: 2.5", "image": "https://k-shop.co.il/wp-content/uploads/2025/02/WhatsApp_Image_2025-02-25_at_12.32.49-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "135", "name": "תחנות משחק מתנפחות קונספט פיראטיים", "category": "carnival", "dimensions": "כל ביתן: רוחב: 1.50 עומק: 2 גובה:2.60", "image": "https://k-shop.co.il/wp-content/uploads/2025/02/WhatsApp-Image-2025-02-25-at-15.36.30-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "136", "name": "מתנפח בול פגיעה בסגנון חלל", "category": "carnival", "dimensions": "אורך 4.6 רוחב 3", "image": "https://k-shop.co.il/wp-content/uploads/2025/03/WhatsApp_Image_2025-03-13_at_11.21.20-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "137", "name": "מגלשת מים צבעונית", "category": "waterslide", "dimensions": "אורך 7 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2025/03/WhatsApp_Image_2025-03-23_at_10.05.01-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "138", "name": "מגלשת מים חלל", "category": "waterslide", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2025/03/WhatsApp_Image_2025-03-04_at_21.07.05-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "139", "name": "מתנפח נינג'ה 19 מטר", "category": "challenge", "dimensions": "אורך 19 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2025/04/WhatsApp_Image_2025-04-01_at_18.02.48__3_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "140", "name": "מתנפח שער קרנבל (4/2)", "category": "arch", "dimensions": "4 על 2", "image": "https://k-shop.co.il/wp-content/uploads/2025/04/WhatsApp_Image_2025-04-25_at_15.44.58-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "141", "name": "מתנפח מתחם לייזר קווסט (10/6)", "category": "challenge", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2025/05/WhatsApp_Image_2025-05-05_at_17.26.57__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "142", "name": "מגלשת מים גלידות", "category": "waterslide", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2025/05/WhatsApp_Image_2025-05-05_at_18.51.17__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "143", "name": "מתנפח קפיצות מכונית שטח", "category": "bounce", "dimensions": "אורך: 4.5 עומק: 4.5 גובה: 4.56", "image": "https://k-shop.co.il/wp-content/uploads/2025/05/WhatsApp_Image_2025-05-06_at_15.19.14__1_-removebg-preview-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "144", "name": "מתנפח שטיפת מכוניות (9/2.5)", "category": "waterslide", "dimensions": "אורך: 9 רוחב: 2.5", "image": "https://k-shop.co.il/wp-content/uploads/2025/05/WhatsApp_Image_2025-05-14_at_11.28.55-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "145", "name": "מתנפח שער חלל (4/2)", "category": "arch", "dimensions": "4 על 2", "image": "https://k-shop.co.il/wp-content/uploads/2025/06/WhatsApp_Image_2025-06-18_at_20.29.04-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "146", "name": "מתנפח שער ספארי (4/2)", "category": "arch", "dimensions": "4 על 2", "image": "https://k-shop.co.il/wp-content/uploads/2025/06/WhatsApp_Image_2025-06-18_at_20.29.04__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "147", "name": "מתנפח כדורסל זוגי", "category": "sport", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2025/06/WhatsApp_Image_2025-06-26_at_09.28.05-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "148", "name": "תחנות משחק מתנפחות קונספט יריד", "category": "carnival", "dimensions": "כל ביתן: רוחב: 1.50 עומק: 2 גובה:2.60", "image": "https://k-shop.co.il/wp-content/uploads/2025/07/509427935_10162769968048516_8276776842030008919_n.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "149", "name": "מתנפח בול פגיעה", "category": "carnival", "dimensions": "4X3X2.8", "image": "https://k-shop.co.il/wp-content/uploads/2025/07/WhatsApp-Image-2025-07-24-at-15.42.49.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "150", "name": "מגלשת מים רובוט", "category": "waterslide", "dimensions": "אורך 7 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2025/08/WhatsApp_Image_2025-08-07_at_17.39.54-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "151", "name": "מתנפח עיר הילדים משולב", "category": "bounce", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2025/08/WhatsApp_Image_2025-08-17_at_10.15.31-removebg-preview.jpg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "152", "name": "מתנפח רשת כדורעף", "category": "sport", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2025/08/WhatsApp-Image-2025-08-10-at-18.06.40-2.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "153", "name": "מתנפח טירת קפיצות אדומה", "category": "bounce", "dimensions": "אורך: 2.8 עומק: 2.8 גובה: 2.5", "image": "https://k-shop.co.il/wp-content/uploads/2025/08/ChatGPT-Image-Aug-20-2025-06_07_14-PM.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "154", "name": "מתנפח אתגרון ספינת השודדים משולב מגלשה", "category": "waterslide", "dimensions": "אורך: 8 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2025/09/ללא-שם.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "155", "name": "מגלשת מים דיסקו מיני", "category": "waterslide", "dimensions": "אורך 7 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2025/09/WhatsApp-Image-2025-09-04-at-11.12.34-scaled.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "156", "name": "מגלשת מים כריש ענקית", "category": "waterslide", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2025/12/WhatsApp_Image_2025-12-15_at_08.06.35-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "157", "name": "סירת פדלים לילדים – סירת מים צבעונית עם פדלים", "category": "pool", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2025/12/WhatsApp_Image_2025-07-17_at_17.57.19__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "158", "name": "מגלשת מים טראמפ בסגנון אמריקאי", "category": "waterslide", "dimensions": "אורך: 8 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2025/12/WhatsApp_Image_2025-12-16_at_09.16.23__5_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "159", "name": "מגלשת מים טראמפ ענקית 15 מטר", "category": "waterslide", "dimensions": "אורך: 15 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2025/12/WhatsApp_Image_2025-12-23_at_11.49.42-removebg-preview-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "160", "name": "מתנפח קפיצה דיסקו ענק", "category": "bounce", "dimensions": "אורך 6 מטר | רוחב 4.8 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2025/12/WhatsApp_Image_2025-12-25_at_15.47.39-removebg-preview-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "161", "name": "מתנפח עמדת DJ אוזניות", "category": "arch", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2025/12/WhatsApp_Image_2025-12-30_at_13.20.56-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "162", "name": "מתנפח ARENA – זירת משחק אינטראקטיבית למערכת IPS", "category": "challenge", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2025/12/WhatsApp_Image_2025-12-30_at_17.37.22__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "163", "name": "מייצג מתנפח אריה ענק", "category": "character", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp-Image-2026-01-12-at-17.33.33-1-2.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "164", "name": "מייצג מתנפח זברה ענק", "category": "character", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/מייצג-זברה.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "165", "name": "מייצג מתנפח ג’ירפה ענק", "category": "character", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/מייצב-מתנפח-גירפה.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "166", "name": "מייצג מתנפח תוכי ענק", "category": "character", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp-Image-2026-01-12-at-17.33.32-1-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "167", "name": "מייצג מתנפח טוטם טיקי ענק", "category": "character", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp-Image-2026-01-12-at-17.33.32.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "168", "name": "מייצג מתנפח פיל ענק", "category": "character", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp-Image-2026-01-12-at-18.29.42-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "169", "name": "שער כניסה מתנפח גיבורים", "category": "arch", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp-Image-2026-01-15-at-11.48.48-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "170", "name": "שער כניסה מתנפח ממתקים", "category": "arch", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp-Image-2026-01-15-at-09.16.27-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "171", "name": "שער כניסה מתנפח סוכריות", "category": "arch", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp-Image-2026-01-15-at-11.48.48-3-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "172", "name": "בריכת מים K-Summer Pool 4/4", "category": "pool", "dimensions": "4×4 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp_Image_2026-01-27_at_09.52.29__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "173", "name": "בריכת מים K-Summer Pool 5/5", "category": "pool", "dimensions": "5x5 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp_Image_2026-01-27_at_09.52.29__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "174", "name": "בריכת מים K-Summer Pool 6/6", "category": "pool", "dimensions": "6x6 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp_Image_2026-01-27_at_09.52.29__1_-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "175", "name": "מתנפח קרניבל 3 תחנות חלל", "category": "carnival", "dimensions": "", "image": "https://k-shop.co.il/wp-content/uploads/2026/01/WhatsApp_Image_2026-01-28_at_14.55.40-removebg-preview-1.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "176", "name": "מתנפח הוקי אנושי בסגנון חלל", "category": "sport", "dimensions": "8X3 מטר הוא אטרקציה ספורטיבית מרגשת המשלבת פעילות גופנית, תחרותיות וכי", "image": "https://k-shop.co.il/wp-content/uploads/2026/02/WhatsApp-Image-2026-02-17-at-12.07.52-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "177", "name": "מתנפח אתגרון בסגנון קרקס", "category": "bounce", "dimensions": "8x3 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2026/02/WhatsApp_Image_2026-02-26_at_12.23.12-removebg-preview.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "178", "name": "מגלשת מים דולפין – דגם SPLASH PRO", "category": "waterslide", "dimensions": "אורך: 5 מטר", "image": "https://k-shop.co.il/wp-content/uploads/2026/03/WhatsApp-Image-2026-03-02-at-13.13.24-1.jpeg", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}, {"id": "179", "name": "מתנפח 3 תחנות בסגנון קרקס", "category": "carnival", "dimensions": "2.5x2x3.95m", "image": "https://k-shop.co.il/wp-content/uploads/2026/04/WhatsApp_Image_2026-04-14_at_11.07.35-removebg-preview-2.png", "costPrice": 0, "warehouse": "alishma_old", "quantity": 0, "futureQty": 0, "futureDate": ""}];
+
+    // ─────────────────────────────────────────
+    // localStorage helpers
+    // ─────────────────────────────────────────
+    const loadProducts = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.length > 0) return parsed;
+        }
+        // First run – seed from site data
+        persistProducts(SEED_PRODUCTS);
+        return SEED_PRODUCTS;
+      } catch { return SEED_PRODUCTS; }
+    };
+    const persistProducts = (list) => localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+
+    // ─────────────────────────────────────────
+    // עזרים
+    // ─────────────────────────────────────────
+    const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+    const productStatus = (p) => {
+      if (p.quantity > 2)
+        return { key: 'ok',      label: '✅ במלאי',       cls: 'bg-green-100 text-green-700' };
+      if (p.quantity > 0)
+        return { key: 'low',     label: '⚠️ מלאי נמוך',   cls: 'bg-yellow-100 text-yellow-700' };
+      if ((p.futureQty || 0) > 0)
+        return { key: 'future',  label: '⏳ מגיע בקרוב',  cls: 'bg-orange-100 text-orange-700' };
+      return   { key: 'out',     label: '❌ אזל',          cls: 'bg-red-100 text-red-700' };
+    };
+
+    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('he-IL') : '';
+
+    const buildWhatsAppText = (products) => {
+      const lines = products.map((p) => {
+        const s = productStatus(p);
+        let statusLine =
+          s.key === 'future'
+            ? `מגיע בקרוב${p.futureDate ? ' (' + fmtDate(p.futureDate) + ')' : ''}`
+            : s.key === 'out'
+            ? 'אזל מהמלאי'
+            : 'זמין במלאי';
+        return `*${p.name}*\nמידות: ${p.dimensions || '—'}\n${statusLine}`;
+      });
+      return `שלום! הנה המוצרים שביקשת:\n\n${lines.join('\n\n')}\n\nלפרטים נוספים והזמנה - נשמח לעזור!`;
+    };
+
+    // ─────────────────────────────────────────
+    // קומפוננטה: LoginPage
+    // ─────────────────────────────────────────
+    // ─────────────────────────────────────────
+    // LoginPage — מבוסס Supabase Auth (email + password)
+    // ─────────────────────────────────────────
+    function LoginPage({ onLogin }) {
+      const [email,   setEmail]   = useState('');
+      const [pw,      setPw]      = useState('');
+      const [err,     setErr]     = useState('');
+      const [loading, setLoading] = useState(false);
+
+      const doLogin = async (e) => {
+        e.preventDefault();
+        setErr('');
+        if (!email || !pw) { setErr('יש למלא מייל וסיסמה'); return; }
+        setLoading(true);
+        const { data, error } = await db.auth.signInWithPassword({ email: email.trim(), password: pw });
+        setLoading(false);
+        if (error) { setErr('מייל או סיסמה שגויים'); setPw(''); return; }
+        onLogin(data.user);
+      };
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-xs text-center">
+            <div className="text-5xl mb-3">🔐</div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-1">K-Shop</h1>
+            <p className="text-gray-400 text-sm mb-6">כניסת מנהל</p>
+
+            <form onSubmit={doLogin} className="space-y-3">
+              <input
+                autoFocus type="email" placeholder="כתובת מייל"
+                value={email} dir="ltr"
+                onChange={e => { setEmail(e.target.value); setErr(''); }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-center text-sm
+                           focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              <input
+                type="password" placeholder="סיסמה"
+                value={pw}
+                onChange={e => { setPw(e.target.value); setErr(''); }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-center text-base
+                           focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              {err && <p className="text-red-500 text-sm">{err}</p>}
+              <button type="submit" disabled={loading}
+                className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white
+                           font-semibold py-3 rounded-xl transition-colors">
+                {loading ? '⏳ ...' : 'כניסה'}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // קומפוננטה: CategoryFilter
+    // ─────────────────────────────────────────
+    function CategoryFilter({ active, onChange, categories = CATEGORIES, adminMode = false, onAddCategory = null }) {
+      return (
+        <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar items-center">
+          {categories.map(c => (
+            <button key={c.key} onClick={() => onChange(c.key)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
+                ${active === c.key
+                  ? 'bg-indigo-500 text-white shadow-sm'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:border-indigo-300'}`}>
+              {c.label}
+            </button>
+          ))}
+          {adminMode && onAddCategory && (
+            <button onClick={onAddCategory}
+              className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium bg-white text-indigo-500
+                         border border-indigo-300 hover:bg-indigo-50 transition-colors whitespace-nowrap">
+              ➕ קטגוריה
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // קומפוננטה: ProductCard
+    // ─────────────────────────────────────────
+    function ProductCard({ product, selected, onToggle, adminMode, onEdit, onQuantityChange, onDragStart, onDragOver, onDrop, warehouses = DEFAULT_WAREHOUSES }) {
+      const s  = productStatus(product);
+      const wqty = getWqty(product);
+      const allEntries       = warehouses.map(w => ({ ...w, qty: wqty[w.key] || 0 }));
+      const warehouseEntries = allEntries.filter(w => w.qty > 0);
+      const whFallback = warehouseEntries.length === 0 && product.warehouse
+        ? [{ ...(warehouses.find(w => w.key === product.warehouse) || {}), qty: product.quantity || 0 }].filter(w => w.key)
+        : null;
+      const [whPopup, setWhPopup] = useState(null); // null | 'plus' | 'minus'
+      // + מציג את כל המחסנים, − מציג רק אלה עם מלאי
+      const popupEntries = whPopup === 'plus'
+        ? allEntries
+        : (warehouseEntries.length > 0 ? warehouseEntries : (whFallback || allEntries));
+
+      const handlePM = (e, delta) => {
+        e.stopPropagation();
+        setWhPopup(delta === -1 ? 'minus' : 'plus');
+      };
+
+      const handleWhChoice = (e, whKey, delta) => {
+        e.stopPropagation();
+        onQuantityChange(product.id, delta, whKey);
+        setWhPopup(null);
+      };
+
+      return (
+        <div
+          draggable={adminMode}
+          onDragStart={(e) => { if (onDragStart) onDragStart(e, product); }}
+          onDragOver={(e) => { if (onDragOver && adminMode) onDragOver(e); }}
+          onDrop={(e) => { if (onDrop) onDrop(e, product); }}
+          onClick={() => onToggle(product.id)}
+          className={`bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer
+            transition-all duration-150 select-none relative group
+            ${selected
+              ? 'ring-2 ring-indigo-500 shadow-md shadow-indigo-100'
+              : 'hover:shadow-md hover:scale-[1.01]'}
+            ${adminMode ? 'cursor-grab active:cursor-grabbing' : ''}`}>
+
+          {/* תמונה */}
+          <div className="relative aspect-square bg-gray-100">
+            {product.image
+              ? <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+              : <div className="w-full h-full flex items-center justify-center text-5xl text-gray-200">🎈</div>
+            }
+
+            {/* Handle - ניידות במצב ניהול */}
+            {adminMode && (
+              <div className="absolute top-2 right-2 bg-gray-600/70 text-white px-2 py-1 rounded
+                             text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-grab
+                             active:cursor-grabbing" title="גרור לשינוי סדר">
+                ≡
+              </div>
+            )}
+
+            {/* תג סטטוס */}
+            <span className={`absolute top-2 left-2 text-xs font-medium px-2 py-0.5 rounded-full ${s.cls}`}>
+              {s.label}
+            </span>
+
+            {/* V כשנבחר */}
+            {selected && (
+              <div className="absolute inset-0 bg-indigo-500/10 flex items-end justify-end p-2">
+                <div className="bg-indigo-500 text-white rounded-full w-7 h-7 flex items-center
+                                justify-center text-base font-bold shadow-lg">✓</div>
+              </div>
+            )}
+
+            {/* כפתור עריכה - רק במצב ניהול */}
+            {adminMode && (
+              <button
+                onClick={e => { e.stopPropagation(); onEdit(product); }}
+                className="absolute bottom-2 right-2 bg-white/90 hover:bg-white rounded-full w-7 h-7
+                           flex items-center justify-center shadow text-sm transition-colors">
+                ✏️
+              </button>
+            )}
+          </div>
+
+          {/* תוכן */}
+          <div className="p-3">
+            <h3 className="font-bold text-gray-800 text-sm leading-tight">{product.name}</h3>
+            {product.dimensions &&
+              <p className="text-gray-500 text-xs mt-0.5">{product.dimensions}</p>}
+
+            {/* מידע ניהולי – רק במצב ניהול */}
+            {adminMode && (
+              <div className="mt-2 pt-2 border-t border-gray-100 space-y-1 text-xs">
+                {/* מחסנים + כמויות */}
+                {(() => {
+                  const entries = warehouseEntries.length > 0 ? warehouseEntries : (whFallback || []);
+                  return entries.length > 0 ? (
+                    <div>
+                      <span className="text-gray-400 text-xs">מחסן</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {entries.map(w => (
+                          <span key={w.key}
+                            className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                            {w.label}
+                            <span className="bg-indigo-200 text-indigo-800 rounded-full px-1.5 font-bold">{w.qty}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+                {/* כפתורי +/- מלאי מהיר + popup בחירת מחסן */}
+                <div className="relative" onClick={e => e.stopPropagation()}>
+                  {/* popup בחירת מחסן */}
+                  {whPopup && (
+                    <div className="absolute bottom-9 right-0 left-0 bg-white rounded-xl border border-gray-200
+                                    shadow-lg z-20 p-2 text-xs"
+                         onClick={e => e.stopPropagation()}>
+                      <p className="text-gray-400 text-center mb-2">
+                        {whPopup === 'minus' ? 'מאיזה מחסן להוריד?' : 'לאיזה מחסן להוסיף?'}
+                      </p>
+                      {popupEntries.map(w => (
+                        <button key={w.key}
+                          onClick={e => handleWhChoice(e, w.key, whPopup === 'minus' ? -1 : +1)}
+                          disabled={whPopup === 'minus' && w.qty <= 0}
+                          className="w-full flex justify-between items-center px-2 py-1.5 rounded-lg
+                                     hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed
+                                     transition-colors mb-0.5">
+                          <span className="text-gray-700 font-medium">{w.label}</span>
+                          <span className="text-indigo-600 font-bold">{w.qty} יח׳</span>
+                        </button>
+                      ))}
+                      <button onClick={e => { e.stopPropagation(); setWhPopup(null); }}
+                        className="w-full text-center text-gray-400 text-xs mt-1 py-1 hover:text-gray-600">
+                        ביטול
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-xs">סה"כ</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={e => handlePM(e, -1)}
+                        disabled={product.quantity <= 0}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold
+                                   text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed
+                                   transition-colors text-base leading-none
+                                   ${whPopup === 'minus'
+                                     ? 'bg-indigo-100 text-indigo-600'
+                                     : 'bg-gray-100 hover:bg-red-100 hover:text-red-600'}`}>
+                        −
+                      </button>
+                      <span className="font-bold text-gray-800 w-6 text-center text-xs">
+                        {product.quantity ?? 0}
+                      </span>
+                      <button
+                        onClick={e => handlePM(e, +1)}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold
+                                   text-gray-500 transition-colors text-base leading-none
+                                   ${whPopup === 'plus'
+                                     ? 'bg-indigo-100 text-indigo-600'
+                                     : 'bg-gray-100 hover:bg-green-100 hover:text-green-600'}`}>
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {product.sku && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">מק"ט</span>
+                    <span className="text-gray-500 font-mono text-xs">{product.sku}</span>
+                  </div>
+                )}
+                {product.costPrice > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">עלות</span>
+                    <span className="font-semibold text-indigo-600">₪{Number(product.costPrice).toLocaleString()}</span>
+                  </div>
+                )}
+                {(product.futureQty || 0) > 0 && (
+                  <div className="text-orange-600 pt-0.5">
+                    📦 {product.futureQty} יח׳ מגיעות
+                    {product.futureDate && ` – ${fmtDate(product.futureDate)}`}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // קומפוננטה: QRPanel – סריקת QR לחיבור
+    // ─────────────────────────────────────────
+    function QRPanel({ serverUrl, onConnected }) {
+      const [qrImg,  setQrImg]  = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [error,   setError]   = useState('');
+      const pollRef = useRef(null);
+
+      const fetchQR = async () => {
+        try {
+          const r = await fetch(serverUrl + '/qr', { signal: AbortSignal.timeout(8000), headers: { 'ngrok-skip-browser-warning': 'true' } });
+          const d = await r.json();
+          if (d.status === 'ready') { clearInterval(pollRef.current); onConnected(); return; }
+          if (d.qr) { setQrImg(d.qr); setLoading(false); }
+          else { setLoading(false); setError('QR לא זמין עדיין…'); }
+        } catch (e) {
+          setLoading(false); setError('שגיאה בטעינת QR: ' + e.message);
+        }
+      };
+
+      useEffect(() => {
+        fetchQR();
+        pollRef.current = setInterval(fetchQR, 4000);
+        return () => clearInterval(pollRef.current);
+      }, []);
+
+      return (
+        <div className="p-6 text-center space-y-4">
+          <p className="font-semibold text-gray-700">סרוק עם הוואטסאפ העסקי שלך</p>
+          {loading && <div className="text-4xl animate-spin inline-block">⏳</div>}
+          {error   && <p className="text-orange-500 text-sm">{error}</p>}
+          {qrImg   && <img src={qrImg} alt="QR" className="mx-auto rounded-xl border-2 border-gray-200 w-56 h-56 object-contain" />}
+          {qrImg   && <p className="text-xs text-gray-400">לאחר הסריקה הדף יתעדכן אוטומטית</p>}
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // ─────────────────────────────────────────
+    // קומפוננטה: ContactPicker
+    // ─────────────────────────────────────────
+    function ContactPicker({ onSelect }) {
+      const [contacts,     setContacts]     = useState([]);
+      const [query,        setQuery]        = useState('');
+      const [selected,     setSelected]     = useState(null);
+      const [open,         setOpen]         = useState(false);
+      const [showSaveForm, setShowSaveForm] = useState(false);
+      const [newName,      setNewName]      = useState('');
+      const [saving,       setSaving]       = useState(false);
+      const inputRef = useRef();
+
+      useEffect(() => { contactsLoad().then(setContacts); }, []);
+
+      // סגור dropdown בלחיצה מחוץ
+      useEffect(() => {
+        const handler = (e) => {
+          if (inputRef.current && !inputRef.current.closest('.cp-wrap').contains(e.target))
+            setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+      }, []);
+
+      const digits = query.replace(/\D/g, '');
+      const filtered = query.length > 0
+        ? contacts.filter(c => {
+            const nameMatch  = c.name.toLowerCase().includes(query.toLowerCase());
+            const phoneMatch = digits.length > 0 && c.phone.replace(/\D/g,'').includes(digits);
+            return nameMatch || phoneMatch;
+          })
+        : contacts;
+
+      const isPhoneQuery = /^[\d\s\-\+\(\)]{7,}$/.test(query.trim());
+      const alreadySaved = contacts.some(c => c.phone.replace(/\D/g,'') === query.replace(/\D/g,''));
+
+      const select = (contact) => {
+        setSelected(contact); setQuery(''); setOpen(false); setShowSaveForm(false);
+        onSelect(contact.phone, contact.name);
+      };
+
+      const clear = () => { setSelected(null); setQuery(''); onSelect('', ''); };
+
+      const saveNew = async () => {
+        if (!newName.trim()) return;
+        setSaving(true);
+        const contact = { id: uid(), name: newName.trim(), phone: query.replace(/\D/g,'') };
+        await contactUpsert(contact);
+        setContacts(prev => [...prev, contact].sort((a,b) => a.name.localeCompare(b.name, 'he')));
+        select(contact);
+        setShowSaveForm(false); setNewName(''); setSaving(false);
+      };
+
+      return (
+        <div className="cp-wrap relative">
+          {selected ? (
+            <div className="flex items-center gap-3 border-2 border-green-400 bg-green-50
+                            rounded-xl px-4 py-3">
+              <div className="w-9 h-9 rounded-full bg-green-200 flex items-center justify-center
+                              text-green-800 font-bold text-sm flex-shrink-0">
+                {selected.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-800 text-sm leading-tight">{selected.name}</p>
+                <p className="text-xs text-gray-500 font-mono" dir="ltr">{selected.phone}</p>
+              </div>
+              <button onClick={clear}
+                className="text-gray-400 hover:text-red-500 text-2xl leading-none flex-shrink-0">
+                ×
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="relative" ref={inputRef}>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="חפש שם או הכנס מספר..."
+                  value={query}
+                  onChange={e => { setQuery(e.target.value); setOpen(true); setSendError && setSendError(''); }}
+                  onFocus={() => setOpen(true)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && filtered.length === 1) select(filtered[0]);
+                    if (e.key === 'Escape') setOpen(false);
+                  }}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base
+                             focus:outline-none focus:ring-2 focus:ring-green-300"
+                />
+                {query && (
+                  <button onClick={() => { setQuery(''); setOpen(false); }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400
+                               hover:text-gray-600 text-xl leading-none">
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {open && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200
+                                rounded-xl shadow-xl z-30 max-h-52 overflow-y-auto">
+                  {filtered.length > 0
+                    ? filtered.map(c => {
+                      // הדגשת החלק שמתאים
+                      const hi = (str, q) => {
+                        if (!q) return str;
+                        const idx = str.toLowerCase().indexOf(q.toLowerCase());
+                        if (idx === -1) return str;
+                        return [str.slice(0, idx), <strong key="h" className="text-indigo-600">{str.slice(idx, idx + q.length)}</strong>, str.slice(idx + q.length)];
+                      };
+                      const phoneStr = c.phone;
+                      const phoneHi  = digits.length > 0 ? hi(phoneStr, digits) : phoneStr;
+                      return (
+                        <button key={c.id} onClick={() => select(c)}
+                          className="w-full flex justify-between items-center px-4 py-3
+                                     hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center
+                                            justify-center text-indigo-700 font-bold text-xs flex-shrink-0">
+                              {c.name.charAt(0)}
+                            </div>
+                            <span className="font-medium text-gray-800 text-sm">{hi(c.name, query)}</span>
+                          </div>
+                          <span className="text-gray-400 text-xs font-mono" dir="ltr">{phoneHi}</span>
+                        </button>
+                      );
+                    })
+                    : query.length > 0 && !isPhoneQuery && (
+                        <p className="text-center text-gray-400 text-sm py-4">לא נמצאו תוצאות</p>
+                      )
+                  }
+                  {isPhoneQuery && !alreadySaved && !showSaveForm && (
+                    <button onClick={() => { setShowSaveForm(true); setOpen(false); }}
+                      className="w-full py-3 px-4 text-sm text-indigo-600 hover:bg-indigo-50
+                                 border-t border-gray-100 font-medium transition-colors flex items-center gap-2">
+                      <span className="text-lg">+</span> שמור {query} כאיש קשר
+                    </button>
+                  )}
+                  {isPhoneQuery && (
+                    <button onClick={() => { onSelect(query.replace(/\D/g,''), ''); setOpen(false); }}
+                      className="w-full py-3 px-4 text-sm text-gray-500 hover:bg-gray-50
+                                 border-t border-gray-100 transition-colors">
+                      שלח למספר {query} ללא שמירה
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {showSaveForm && (
+                <div className="mt-2 bg-indigo-50 rounded-xl p-3 flex gap-2 items-center">
+                  <input autoFocus placeholder="שם איש הקשר" value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && saveNew()}
+                    className="flex-1 border border-indigo-200 rounded-lg px-3 py-2 text-sm
+                               focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+                  <button onClick={saveNew} disabled={saving || !newName.trim()}
+                    className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium
+                               hover:bg-indigo-600 disabled:opacity-50 whitespace-nowrap">
+                    {saving ? '...' : 'שמור'}
+                  </button>
+                  <button onClick={() => setShowSaveForm(false)}
+                    className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">×</button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // ContactPickerWithAdd — ContactPicker + כפתור הוספה מהירה
+    // ─────────────────────────────────────────
+    function ContactPickerWithAdd({ onSelect, sendError }) {
+      const [showAdd, setShowAdd]   = useState(false);
+      const [addName, setAddName]   = useState('');
+      const [addPhone, setAddPhone] = useState('');
+      const [saving, setSaving]     = useState(false);
+      const [contacts, setContacts] = useState([]);
+      const [refreshKey, setRefreshKey] = useState(0);
+
+      useEffect(() => { contactsLoad().then(setContacts); }, [refreshKey]);
+
+      const saveContact = async () => {
+        if (!addName.trim() || !addPhone.trim()) return;
+        setSaving(true);
+        const c = { id: uid(), name: addName.trim(), phone: addPhone.replace(/\D/g,'') };
+        await contactUpsert(c);
+        setRefreshKey(k => k + 1);
+        onSelect(c.phone);
+        setAddName(''); setAddPhone(''); setShowAdd(false); setSaving(false);
+      };
+
+      return (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm font-medium text-gray-700">שליחה אל</label>
+            <button onClick={() => setShowAdd(v => !v)}
+              className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-medium
+                         transition-colors ${showAdd
+                           ? 'bg-gray-200 text-gray-600'
+                           : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}>
+              {showAdd ? '✕ ביטול' : '+ איש קשר חדש'}
+            </button>
+          </div>
+
+          {showAdd ? (
+            <div className="bg-indigo-50 rounded-xl p-3 space-y-2">
+              <input autoFocus placeholder="שם" value={addName}
+                onChange={e => setAddName(e.target.value)}
+                className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+              <input placeholder="מספר טלפון" value={addPhone}
+                onChange={e => setAddPhone(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveContact()}
+                dir="ltr"
+                className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+              <button onClick={saveContact}
+                disabled={saving || !addName.trim() || !addPhone.trim()}
+                className="w-full py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium
+                           hover:bg-indigo-600 disabled:opacity-50 transition-colors">
+                {saving ? 'שומר...' : 'שמור ובחר'}
+              </button>
+            </div>
+          ) : (
+            <>
+              <ContactPicker key={refreshKey} onSelect={(num) => onSelect(num)} />
+              {sendError && <p className="text-red-500 text-sm mt-1 text-center">{sendError}</p>}
+            </>
+          )}
+        </div>
+      );
+    }
+
+    // קומפוננטה: WhatsAppModal
+    // ─────────────────────────────────────────
+    // SERVER URL – saved in localStorage (synced from Supabase on load)
+    const getServer = () =>
+      localStorage.getItem('kshop_server_url') ||
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:3001'
+        : '');
+    const NGROK_HEADER = {};
+
+    function WhatsAppModal({ products, onClose, isCustomerMode = false }) {
+      const { useEffect } = React;
+      const [serverStatus, setServerStatus] = useState('checking'); // checking|ready|qr|disconnected
+      const [phone,        setPhone]        = useState('');
+      const [manualPhone,  setManualPhone]  = useState('');
+      const [sending,      setSending]      = useState(false);
+      const [progress,     setProgress]     = useState(null);
+      const [done,         setDone]         = useState(false);
+      const [sendError,    setSendError]    = useState('');
+      const [textCopied,   setTextCopied]   = useState(false);
+
+      const text = buildWhatsAppText(products);
+      const businessNumber = localStorage.getItem('kshop_whatsapp_number') || '';
+      const srv = getServer();
+
+      // בדוק אם השרת רץ
+      useEffect(() => {
+        if (!srv) { setServerStatus('no_server'); return; }
+        fetch(srv + '/status', { signal: AbortSignal.timeout(6000), headers: { 'ngrok-skip-browser-warning': 'true' } })
+          .then(r => r.json())
+          .then(d => setServerStatus(d.status === 'ready' ? 'ready' : d.status === 'qr' ? 'qr' : 'disconnected'))
+          .catch(() => setServerStatus('disconnected'));
+      }, []);
+
+      // ── שליחה אוטומטית ──────────────────────────────────
+      const autoSend = async () => {
+        const cleaned = phone.replace(/\D/g, '');
+        if (cleaned.length < 9) { setSendError('הזן מספר טלפון תקין'); return; }
+        setSending(true); setSendError(''); setDone(false);
+
+        const images = products.map(p => ({
+          name: p.name,
+          url:    p.image?.startsWith('http')  ? p.image : null,
+          base64: p.image?.startsWith('data:') ? p.image : null,
+        }));
+
+        setProgress({ label: 'שולח הודעה...', done: 0, total: images.length + 1 });
+
+        try {
+          const resp = await fetch(srv + '/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+            body: JSON.stringify({ phone, text, images }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || 'שגיאה בשליחה');
+          setDone(true);
+          setProgress(null);
+        } catch (e) {
+          setSendError(e.message);
+        } finally {
+          setSending(false);
+        }
+      };
+
+      // ── fallback: העתק טקסט + פתח WA ──────────────────
+      const copyText = () =>
+        navigator.clipboard.writeText(text)
+          .then(() => { setTextCopied(true); setTimeout(() => setTextCopied(false), 2500); });
+
+      const openWA = () => {
+        const target = manualPhone || (isCustomerMode ? businessNumber : '');
+        window.open('https://wa.me/' + target + '?text=' + encodeURIComponent(text), '_blank');
+      };
+
+      // ── Render ──────────────────────────────────────────
+      return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6"
+             onClick={onClose}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto"
+               onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <div>
+                <h2 className="font-bold text-lg">שליחה בוואטסאפ</h2>
+                <p className="text-xs mt-0.5">
+                  {serverStatus === 'checking'     && <span className="text-gray-400">⏳ בודק חיבור לשרת...</span>}
+                  {serverStatus === 'ready'        && <span className="text-green-600 font-medium">✅ מחובר – שליחה אוטומטית</span>}
+                  {serverStatus === 'qr'           && <span className="text-blue-500 font-medium">📱 ממתין לסריקת QR</span>}
+                  {serverStatus === 'disconnected' && <span className="text-orange-500">⚠️ שרת לא פועל – מצב ידני</span>}
+                  {serverStatus === 'no_server'    && <span className="text-gray-400">לא הוגדר שרת – הגדר בהגדרות</span>}
+                </p>
+              </div>
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+
+            {/* ══ QR – צריך לחבר וואטסאפ ══ */}
+            {serverStatus === 'qr' && <QRPanel serverUrl={srv} onConnected={() => setServerStatus('ready')} />}
+
+            {/* ══ מצב אוטומטי (שרת מחובר) ══ */}
+            {serverStatus === 'ready' && !done && (
+              <div className="p-5 space-y-4">
+
+                {/* תצוגת מוצרים */}
+                <div className="grid grid-cols-4 gap-2">
+                  {products.map(p => (
+                    <div key={p.id} className="text-center">
+                      <div className="aspect-square rounded-xl overflow-hidden bg-gray-100">
+                        {p.image
+                          ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-2xl text-gray-200">🎈</div>}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1 truncate">{p.name}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* טקסט preview */}
+                <div className="bg-[#dcf8c6] rounded-xl px-4 py-3 text-xs text-gray-700
+                                whitespace-pre-wrap leading-relaxed border border-green-200 max-h-32 overflow-y-auto">
+                  {text}
+                </div>
+
+                {/* בחירת איש קשר */}
+                <ContactPickerWithAdd
+                  onSelect={(num) => { setPhone(num); setSendError(''); }}
+                  sendError={sendError}
+                />
+
+                {/* Progress bar */}
+                {sending && progress && (
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-sm text-gray-600 mb-2 text-center">{progress.label}</p>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="bg-green-500 h-2 rounded-full transition-all duration-500"
+                           style={{ width: progress.total > 0 ? `${(progress.done/progress.total)*100}%` : '20%' }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* כפתור שלח */}
+                <button
+                  onClick={autoSend}
+                  disabled={sending || !phone.trim()}
+                  className="w-full py-4 rounded-xl bg-[#25D366] hover:bg-[#20c05c] text-white
+                             font-bold text-base transition-colors shadow-md disabled:opacity-50
+                             disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  {sending
+                    ? <><span className="animate-spin">⏳</span> שולח...</>
+                    : <>שלח הכל ({products.length} מוצרים)</>}
+                </button>
+              </div>
+            )}
+
+            {/* ══ הצלחה ══ */}
+            {done && (
+              <div className="p-8 text-center">
+                <div className="text-6xl mb-4">✅</div>
+                <p className="font-bold text-lg text-gray-800 mb-1">נשלח בהצלחה!</p>
+                <p className="text-gray-500 text-sm mb-6">
+                  טקסט + {products.length} תמונות נשלחו לוואטסאפ
+                </p>
+                <button onClick={onClose}
+                  className="bg-indigo-500 text-white px-8 py-2.5 rounded-xl font-medium hover:bg-indigo-600">
+                  סגור
+                </button>
+              </div>
+            )}
+
+            {/* ══ מצב ידני (שרת לא פועל / לא מוגדר) ══ */}
+            {(serverStatus === 'disconnected' || serverStatus === 'no_server') && (
+              <div className="p-5 space-y-4">
+
+                {/* הסבר */}
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
+                  <p className="font-semibold text-orange-700 mb-1">⚠️ שרת וואטסאפ לא פעיל</p>
+                  <p className="text-orange-600 text-xs">
+                    {!getServer()
+                      ? 'הגדר כתובת שרת בהגדרות (⚙️) כדי לשלוח אוטומטית.'
+                      : 'וודא שהשרת ב-Railway פועל, ורענן את הדף.'}
+                  </p>
+                </div>
+
+                {/* בחירת איש קשר במצב ידני */}
+                <ContactPickerWithAdd onSelect={(num) => setManualPhone(num)} />
+
+                {/* Fallback ידני */}
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-2">טקסט לשליחה:</p>
+                  <div className="bg-[#dcf8c6] rounded-xl px-4 py-3 text-sm text-gray-800
+                                  whitespace-pre-wrap leading-relaxed border border-green-200 max-h-40 overflow-y-auto mb-3">
+                    {text}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={copyText}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors
+                        ${textCopied ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                      {textCopied ? '✅ הועתק!' : 'העתק טקסט'}
+                    </button>
+                    <button onClick={openWA}
+                      className="flex-1 py-2.5 rounded-xl bg-[#25D366] text-white text-sm font-semibold hover:bg-[#20c05c]">
+                      פתח וואטסאפ
+                    </button>
+                  </div>
+                </div>
+
+                {/* תמונות */}
+                <div>
+                  <p className="text-xs text-gray-500 mb-2">תמונות – לחץ ימני ← העתק תמונה ← הדבק בוואטסאפ:</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {products.map(p => (
+                      <div key={p.id}>
+                        <div className="aspect-square rounded-xl overflow-hidden bg-gray-100">
+                          {p.image
+                            ? <img src={p.image} alt={p.name} className="w-full h-full object-cover cursor-context-menu" />
+                            : <div className="w-full h-full flex items-center justify-center text-2xl text-gray-200">🎈</div>}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1 truncate text-center">{p.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* checking skeleton */}
+            {serverStatus === 'checking' && (
+              <div className="p-8 text-center text-gray-400">
+                <div className="animate-spin text-3xl mb-3">⏳</div>
+                <p className="text-sm">בודק חיבור לשרת...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // קומפוננטה: ProductForm (הוספה / עריכה)
+    // ─────────────────────────────────────────
+    const EMPTY_PRODUCT = () => ({
+      id: uid(), name: '', category: 'bounce', dimensions: '',
+      image: '', costPrice: '', warehouse: 'alishma_old',
+      warehouse_qty: {}, quantity: 0, futureQty: 0, futureDate: '', sku: '', display_order: 0
+    });
+
+    function ProductForm({ product, onSave, onCancel, onDelete, warehouses = DEFAULT_WAREHOUSES }) {
+      const isNew = !product;
+      const [f, setF] = useState(() => {
+        const base = isNew ? EMPTY_PRODUCT() : { ...product };
+        return { ...base, warehouse_qty: getWqty(base) };
+      });
+
+      const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+
+      const handleImage = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 3 * 1024 * 1024) {
+          alert('התמונה גדולה מדי (מעל 3MB). אנא דחס לפני ההעלאה.');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = ev => set('image', ev.target.result);
+        reader.readAsDataURL(file);
+      };
+
+      const submit = (e) => {
+        e.preventDefault();
+        if (!f.name.trim()) { alert('חובה להזין שם מוצר'); return; }
+        const wqty = typeof f.warehouse_qty === 'object' ? f.warehouse_qty : {};
+        const totalFromWqty = Object.values(wqty).reduce((a, b) => a + (Number(b) || 0), 0);
+        // primary warehouse = highest qty
+        const primary = Object.entries(wqty).sort((a, b) => b[1] - a[1])[0];
+        onSave({ ...f,
+          costPrice: Number(f.costPrice) || 0,
+          quantity:  totalFromWqty || Number(f.quantity) || 0,
+          futureQty: Number(f.futureQty) || 0,
+          warehouse_qty: JSON.stringify(wqty),
+          warehouse: (primary && primary[1] > 0) ? primary[0] : (f.warehouse || 'alishma_old'),
+        });
+      };
+
+      const del = () => {
+        if (window.confirm(`למחוק את "${f.name}"?`)) onDelete(f.id);
+      };
+
+      const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm " +
+                       "focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white";
+      const labelCls = "block text-sm font-medium text-gray-700 mb-1";
+
+      return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto">
+
+            {/* Header */}
+            <div className="sticky top-0 bg-white flex items-center justify-between px-5 py-4 border-b z-10">
+              <h2 className="font-bold text-lg">{isNew ? '➕ מוצר חדש' : '✏️ עריכת מוצר'}</h2>
+              <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+
+            <form onSubmit={submit} className="px-5 py-4 space-y-4">
+
+              {/* תמונה */}
+              <div>
+                <label className={labelCls}>תמונה</label>
+                {f.image && (
+                  <div className="relative inline-block mb-2">
+                    <img src={f.image} className="w-28 h-28 object-cover rounded-xl border border-gray-200" />
+                    <button type="button" onClick={() => set('image', '')}
+                      className="absolute -top-1.5 -left-1.5 bg-red-500 text-white rounded-full
+                                 w-5 h-5 text-xs flex items-center justify-center shadow">×</button>
+                  </div>
+                )}
+                <input type="file" accept="image/*" onChange={handleImage} className="text-xs" />
+                <p className="text-xs text-gray-400 mt-0.5">מומלץ: פחות מ-1MB לביצועים טובים</p>
+              </div>
+
+              {/* שם */}
+              <div>
+                <label className={labelCls}>שם המוצר *</label>
+                <input type="text" placeholder="לדוגמה: ספיידרמן קפיצה"
+                  value={f.name} onChange={e => set('name', e.target.value)}
+                  className={inputCls} required />
+              </div>
+
+              {/* מק"ט */}
+              <div>
+                <label className={labelCls}>מק"ט (SKU)</label>
+                <input type="text" placeholder="לדוגמה: BOUNCE-001"
+                  value={f.sku || ''} onChange={e => set('sku', e.target.value)}
+                  className={inputCls} />
+              </div>
+
+              {/* קטגוריה */}
+              <div>
+                <label className={labelCls}>קטגוריה</label>
+                <select value={f.category} onChange={e => set('category', e.target.value)} className={inputCls}>
+                  {CATEGORIES.filter(c => c.key !== 'all').map(c =>
+                    <option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+              </div>
+
+              {/* מידות */}
+              <div>
+                <label className={labelCls}>מידות</label>
+                <input type="text" placeholder="לדוגמה: 4×4 מטר"
+                  value={f.dimensions} onChange={e => set('dimensions', e.target.value)}
+                  className={inputCls} />
+              </div>
+
+              {/* מחיר עלות */}
+              <div>
+                <label className={labelCls}>מחיר עלות (פרטי) ₪</label>
+                <input type="number" min="0" placeholder="0"
+                  value={f.costPrice} onChange={e => set('costPrice', e.target.value)}
+                  className={inputCls} />
+              </div>
+
+              {/* כמות לפי מחסן */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-medium text-gray-700">📦 כמות לפי מחסן</p>
+                {warehouses.map(w => {
+                  const qty = (f.warehouse_qty || {})[w.key] || 0;
+                  return (
+                    <div key={w.key} className="flex items-center gap-3">
+                      <span className="text-sm text-gray-600 flex-1 text-right">{w.label}</span>
+                      <input type="number" min="0" value={qty}
+                        onChange={e => {
+                          const newQty = { ...(f.warehouse_qty || {}), [w.key]: parseInt(e.target.value) || 0 };
+                          const total = Object.values(newQty).reduce((a, b) => a + (Number(b) || 0), 0);
+                          set('warehouse_qty', newQty);
+                          set('quantity', total);
+                        }}
+                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-center
+                                   focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+                    </div>
+                  );
+                })}
+                <div className="flex justify-between items-center pt-1 border-t border-gray-200">
+                  <span className="text-xs text-gray-400">סה"כ</span>
+                  <span className="font-bold text-indigo-600 text-sm">
+                    {Object.values(f.warehouse_qty || {}).reduce((a, b) => a + (Number(b) || 0), 0)} יחידות
+                  </span>
+                </div>
+              </div>
+
+              {/* מלאי עתידי */}
+              <div className="bg-orange-50 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-medium text-orange-700">📦 מלאי עתידי (אופציונלי)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">כמות שהוזמנה</label>
+                    <input type="number" min="0" placeholder="0"
+                      value={f.futureQty} onChange={e => set('futureQty', e.target.value)}
+                      className="w-full border border-orange-200 rounded-lg px-3 py-2 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">תאריך הגעה</label>
+                    <input type="date"
+                      value={f.futureDate} onChange={e => set('futureDate', e.target.value)}
+                      className="w-full border border-orange-200 rounded-lg px-3 py-2 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white" />
+                  </div>
+                </div>
+              </div>
+
+              {/* כפתורי פעולה */}
+              <div className="flex gap-2 pt-1 pb-2">
+                {!isNew && (
+                  <button type="button" onClick={del}
+                    className="px-4 py-2.5 rounded-xl text-sm font-medium text-red-500
+                               border border-red-200 hover:bg-red-50 transition-colors">
+                    🗑️ מחק
+                  </button>
+                )}
+                <button type="button" onClick={onCancel}
+                  className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm
+                             font-medium hover:bg-gray-200 transition-colors">
+                  ביטול
+                </button>
+                <button type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-500 text-white text-sm
+                             font-semibold hover:bg-indigo-600 transition-colors">
+                  {isNew ? 'הוסף מוצר' : 'שמור שינויים'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // קומפוננטה: AddCategoryModal
+    // ─────────────────────────────────────────
+    function AddCategoryModal({ onClose, onAdd }) {
+      const [label, setLabel] = useState('');
+      const [err, setErr] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!label.trim()) { setErr('הזן שם קטגוריה'); return; }
+        const key = label.trim().toLowerCase().replace(/\s+/g, '_');
+        onAdd(key, label.trim());
+        onClose();
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+             onClick={onClose}>
+          <div className="bg-white rounded-2xl w-full max-w-xs p-6"
+               onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg">➕ קטגוריה חדשה</h2>
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <input
+                autoFocus
+                type="text"
+                placeholder="שם הקטגוריה"
+                value={label}
+                onChange={e => setLabel(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+              {err && <p className="text-red-500 text-sm">{err}</p>}
+              <button type="submit"
+                className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-xl
+                           font-semibold text-sm transition-colors">
+                הוסף קטגוריה
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // ─────────────────────────────────────────
+    // קומפוננטה: PricingModal (מחירון PDF)
+    // ── escape HTML — מניעת XSS בתוכן דינמי ──────────────────
+    const escHtml = (s) => String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    // ─────────────────────────────────────────
+    function PricingModal({ products, logoUrl, categories = [], onClose }) {
+      // מחיר לכל מוצר: { [id]: string }
+      const [prices, setPrices] = useState(() => {
+        const init = {};
+        products.forEach(p => { init[p.id] = p.price ? String(p.price) : ''; });
+        return init;
+      });
+
+      const today = new Date().toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const phone = localStorage.getItem('kshop_whatsapp_number') || '972509933322';
+      // Format phone for display: 972XXXXXXXXX → 05X-XXXXXXX
+      const displayPhone = (() => {
+        const d = phone.replace(/\D/g, '');
+        if (d.startsWith('972')) {
+          const local = '0' + d.slice(3);
+          return local.slice(0, 3) + '-' + local.slice(3);
+        }
+        return phone;
+      })();
+
+      const doPrint = () => {
+        // Group products by category
+        const catMap = {};
+        products.forEach(p => {
+          const key = p.category || '__none__';
+          if (!catMap[key]) catMap[key] = [];
+          catMap[key].push(p);
+        });
+
+        // Build category label lookup
+        const catLabel = {};
+        categories.forEach(c => { catLabel[c.key] = c.label; });
+
+        // Build table rows HTML
+        let rowsHtml = '';
+        Object.entries(catMap).forEach(([catKey, prods]) => {
+          const label = catLabel[catKey] || (catKey === '__none__' ? '' : catKey);
+          if (label) {
+            rowsHtml += `<tr class="pc-cat-row"><td colspan="4">${escHtml(label)}</td></tr>`;
+          }
+          prods.forEach(p => {
+            const price  = prices[p.id];
+            // escHtml מגן מ-XSS בכל ערך שבא ממשתמש
+            const safeName  = escHtml(p.name);
+            const safeDims  = escHtml(p.dimensions || '—');
+            const safePrice = escHtml(price || '');
+            const safeImg   = escHtml(p.image || '');
+            const imgTag = safeImg
+              ? `<img src="${safeImg}" class="pc-row-img" alt="${safeName}" />`
+              : `<div class="pc-row-img-placeholder">🎈</div>`;
+            const priceCell = safePrice
+              ? `<td class="pc-price-cell"><span class="pc-price-label">ש"ח</span><span class="pc-price-num">${safePrice}</span></td>`
+              : `<td class="pc-price-cell"><span class="pc-price-empty">—</span></td>`;
+            rowsHtml += `
+              <tr class="pc-row">
+                <td style="text-align:center">${imgTag}</td>
+                <td><div class="pc-row-name">${safeName}</div></td>
+                <td class="pc-row-dims">${safeDims}</td>
+                ${priceCell}
+              </tr>`;
+          });
+        });
+
+        const logoHtml = logoUrl
+          ? `<img src="${logoUrl}" class="pc-logo-img" alt="לוגו" />`
+          : `<div class="pc-logo-wrap" style="display:flex;align-items:center;gap:4px"><span class="pc-logo-k">K</span><span class="pc-logo-s">shop</span></div>`;
+
+        const catalog = document.getElementById('kshop-print-catalog');
+        catalog.innerHTML = `
+          <div class="pc-wrap">
+            <div class="pc-header">
+              <div class="pc-logo-wrap">${logoHtml}</div>
+              <div class="pc-header-title">
+                <div class="pc-catalog-title">קיי שופ און ליין בע״מ — מחירון מיוחד</div>
+                <div class="pc-catalog-date">${today}</div>
+              </div>
+            </div>
+            <table class="pc-table">
+              <thead>
+                <tr>
+                  <th class="col-img">תמונה</th>
+                  <th>שם מוצר</th>
+                  <th>מידות</th>
+                  <th class="col-price">מחיר (ש"ח)</th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+            <div class="pc-footer">לפרטים והזמנות: <strong>${displayPhone}</strong></div>
+          </div>
+        `;
+        window.print();
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4"
+             onClick={onClose}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl"
+               onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="font-bold text-lg text-gray-800">📄 מחירון PDF</h2>
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+
+            {/* Product list with price inputs */}
+            <div className="overflow-y-auto flex-1 px-5 py-3 space-y-2">
+              <p className="text-xs text-gray-400 mb-3">הזן מחיר לכל מוצר שיופיע במחירון (אפשר להשאיר ריק)</p>
+              {products.map(p => (
+                <div key={p.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+                  {p.image
+                    ? <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                    : <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-lg flex-shrink-0">🎈</div>
+                  }
+                  <span className="flex-1 text-sm font-medium text-gray-700 truncate">{p.name}</span>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <span className="text-gray-400 text-sm">₪</span>
+                    <input
+                      type="number"
+                      placeholder="מחיר"
+                      value={prices[p.id] || ''}
+                      onChange={e => setPrices(prev => ({ ...prev, [p.id]: e.target.value }))}
+                      className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-left
+                                 focus:outline-none focus:ring-2 focus:ring-red-300"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer buttons */}
+            <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+              <button onClick={onClose}
+                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-500 text-sm
+                           font-medium hover:bg-gray-50 transition-colors">
+                ביטול
+              </button>
+              <button onClick={doPrint}
+                className="flex-1 py-3 rounded-xl bg-[#cc0000] hover:bg-[#aa0000] text-white text-sm
+                           font-bold transition-colors flex items-center justify-center gap-2 shadow-md">
+                🖨️ הדפס / שמור PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // קומפוננטה: SettingsModal
+    // ─────────────────────────────────────────
+    function SettingsModal({ onClose, onLogout, warehouses = DEFAULT_WAREHOUSES, onSaveWarehouses, logoUrl = '', onSaveLogo }) {
+      const [newPw, setNewPw] = useState('');
+      const [conf, setConf]   = useState('');
+      const [msg, setMsg]     = useState('');
+      const [whatsappNum, setWhatsappNum] = useState(() => localStorage.getItem('kshop_whatsapp_number') || '972509933322');
+      const [serverUrl, setServerUrl] = useState(() => localStorage.getItem('kshop_server_url') || '');
+      const [contacts, setContacts]   = useState([]);
+      const [newCName, setNewCName]   = useState('');
+      const [newCPhone, setNewCPhone] = useState('');
+      const [addingC, setAddingC]     = useState(false);
+      const [showContacts, setShowContacts] = useState(false);
+      const [showWarehouses, setShowWarehouses] = useState(false);
+      const [newWhLabel, setNewWhLabel] = useState('');
+      const importRef         = useRef();
+
+      useEffect(() => { contactsLoad().then(setContacts); }, []);
+
+      const changePw = async (e) => {
+        e.preventDefault();
+        if (newPw.length < 6) { setMsg('❌ סיסמה חייבת להיות לפחות 6 תווים'); return; }
+        if (newPw !== conf)   { setMsg('❌ הסיסמאות לא תואמות'); return; }
+        const { error } = await db.auth.updateUser({ password: newPw });
+        if (error) { setMsg('❌ שגיאה: ' + error.message); return; }
+        setMsg('✅ הסיסמה עודכנה בהצלחה!');
+        setNewPw(''); setConf('');
+      };
+
+      const exportData = () => {
+        const data = JSON.stringify(loadProducts(), null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        const date = new Date().toLocaleDateString('he-IL').replace(/\//g,'-');
+        a.href = url; a.download = `kshop-backup-${date}.json`;
+        a.click(); URL.revokeObjectURL(url);
+      };
+
+      const importData = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            if (!Array.isArray(data)) throw new Error('invalid');
+            persistProducts(data);
+            alert(`יובאו ${data.length} מוצרים בהצלחה!\nרענן את הדף (F5) כדי לראות אותם.`);
+            onClose();
+          } catch { alert('קובץ לא תקין. ודא שזהו קובץ גיבוי של K-Shop.'); }
+        };
+        reader.readAsText(file);
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+             onClick={onClose}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto"
+               onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold text-lg">⚙️ הגדרות</h2>
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+
+            {/* לוגו העסק */}
+            <div className="bg-orange-50 rounded-xl p-4 mb-4 space-y-2">
+              <p className="text-sm font-semibold text-orange-700">🖼 לוגו העסק</p>
+              <p className="text-xs text-orange-500">הלוגו מופיע בראש המחירון המודפס</p>
+              {logoUrl && (
+                <div className="flex items-center gap-3">
+                  <img src={logoUrl} alt="לוגו" className="h-12 rounded border border-orange-200 bg-white p-1" />
+                  <button onClick={() => onSaveLogo && onSaveLogo('')}
+                    className="text-xs text-red-400 hover:text-red-600">הסר</button>
+                </div>
+              )}
+              <label className="block w-full py-2 text-center rounded-xl bg-orange-400 text-white text-sm
+                               font-medium hover:bg-orange-500 transition-colors cursor-pointer">
+                📤 העלה לוגו
+                <input type="file" accept="image/*" className="hidden" onChange={e => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = ev => {
+                    if (onSaveLogo) onSaveLogo(ev.target.result);
+                    setMsg('✅ לוגו נשמר!');
+                    setTimeout(() => setMsg(''), 2500);
+                  };
+                  reader.readAsDataURL(file);
+                }} />
+              </label>
+            </div>
+
+            {/* כתובת שרת וואטסאפ */}
+            <div className="bg-indigo-50 rounded-xl p-4 mb-4 space-y-2">
+              <p className="text-sm font-semibold text-indigo-700">🌐 כתובת שרת וואטסאפ</p>
+              <p className="text-xs text-indigo-500">הכתובת שקיבלת מ-Railway (לדוגמה: https://kshop-wa.up.railway.app)</p>
+              <input
+                type="url"
+                placeholder="https://xxxx.up.railway.app"
+                value={serverUrl}
+                onChange={e => setServerUrl(e.target.value)}
+                dir="ltr"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+              <button onClick={async () => {
+                const url = serverUrl.replace(/\/$/, '');
+                localStorage.setItem('kshop_server_url', url);
+                // שמור גם לסופאבייס כדי שכל המכשירים ידעו
+                try {
+                  await db.from('app_settings').upsert({ key: 'serverURL', value: JSON.stringify(url) }, { onConflict: 'key' });
+                  setMsg('✅ כתובת שרת נשמרה – כל המכשירים יתעדכנו!');
+                } catch {
+                  setMsg('✅ נשמר מקומית');
+                }
+                setTimeout(() => setMsg(''), 3000);
+              }}
+                className="w-full py-2 rounded-xl bg-indigo-500 text-white text-sm
+                           font-medium hover:bg-indigo-600 transition-colors">
+                💾 שמור כתובת
+              </button>
+            </div>
+
+            {/* מספר וואטסאפ של העסק */}
+            <div className="bg-green-50 rounded-xl p-4 mb-5 space-y-2">
+              <p className="text-sm font-semibold text-green-700">מספר וואטסאפ של העסק</p>
+              <p className="text-xs text-green-600">
+                מספר זה יופיע בהודעות וואטסאפ מלקוחות. עיצוב: 972XXXXXXXXX (ללא +)
+              </p>
+              <input
+                type="tel"
+                placeholder="972XXXXXXXXX"
+                value={whatsappNum}
+                onChange={e => setWhatsappNum(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-green-300"
+              />
+              <button onClick={() => {
+                localStorage.setItem('kshop_whatsapp_number', whatsappNum);
+                setMsg('✅ מספר וואטסאפ עודכן בהצלחה!');
+                setTimeout(() => setMsg(''), 2500);
+              }}
+                className="w-full py-2 rounded-xl bg-green-500 text-white text-sm
+                           font-medium hover:bg-green-600 transition-colors">
+                💾 שמור
+              </button>
+            </div>
+
+            {/* אנשי קשר */}
+            <div className="mb-5">
+              <button onClick={() => setShowContacts(v => !v)}
+                className="w-full flex items-center justify-between text-sm font-semibold
+                           text-gray-700 py-2">
+                <span>👥 אנשי קשר ({contacts.length})</span>
+                <span className="text-gray-400 text-xs">{showContacts ? '▲' : '▼'}</span>
+              </button>
+
+              {showContacts && (
+                <div className="mt-2 space-y-2">
+                  {/* ייבוא מוואטסאפ */}
+                  {(() => {
+                    const srv = localStorage.getItem('kshop_server_url');
+                    if (!srv) return null;
+                    return (
+                      <button onClick={async () => {
+                        setMsg('⏳ מייבא מוואטסאפ...');
+                        try {
+                          const r = await fetch(srv + '/contacts', {
+                            headers: { 'ngrok-skip-browser-warning': 'true' }
+                          });
+                          const data = await r.json();
+                          const incoming = data.contacts || [];
+                          // phone = ID קבוע → upsert מונע כפולות אוטומטית
+                          const toUpsert = incoming
+                            .filter(c => c.phone && c.name)
+                            .map(c => ({ id: c.phone, name: c.name, phone: c.phone }));
+                          for (const c of toUpsert) await contactUpsert(c);
+                          const updated = await contactsLoad();
+                          setContacts(updated);
+                          const existingPhones = new Set(contacts.map(x => x.phone));
+                          const newCount = toUpsert.filter(x => !existingPhones.has(x.phone)).length;
+                          setMsg(`✅ יובאו ${newCount} קשרים חדשים (${toUpsert.length} סה"כ)`);
+                          setTimeout(() => setMsg(''), 4000);
+                        } catch(e) {
+                          setMsg('❌ שגיאה: ' + e.message);
+                          setTimeout(() => setMsg(''), 3000);
+                        }
+                      }}
+                        className="w-full py-2 bg-green-500 text-white rounded-xl text-sm
+                                   font-medium hover:bg-green-600 transition-colors flex items-center
+                                   justify-center gap-2">
+                        📲 ייבא קשרים מוואטסאפ
+                      </button>
+                    );
+                  })()}
+                  {contacts.length > 0 && (
+                    <button onClick={async () => {
+                      if (!confirm(`למחוק את כל ${contacts.length} אנשי הקשר?`)) return;
+                      await db.from('contacts').delete().neq('id', '___none___');
+                      setContacts([]);
+                      setMsg('🗑 כל אנשי הקשר נמחקו');
+                      setTimeout(() => setMsg(''), 2500);
+                    }}
+                      className="w-full py-2 bg-red-50 text-red-500 border border-red-200 rounded-xl
+                                 text-sm font-medium hover:bg-red-100 transition-colors">
+                      🗑 מחק את כל אנשי הקשר ({contacts.length})
+                    </button>
+                  )}
+                  {contacts.length === 0 && (
+                    <p className="text-xs text-gray-400 text-center py-2">אין אנשי קשר עדיין</p>
+                  )}
+                  {contacts.map(c => (
+                    <div key={c.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                      <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center
+                                      text-indigo-700 font-bold text-xs flex-shrink-0">
+                        {c.name.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 leading-tight">{c.name}</p>
+                        <p className="text-xs text-gray-400 font-mono" dir="ltr">{c.phone}</p>
+                      </div>
+                      <button onClick={async () => {
+                        await contactDelete(c.id);
+                        setContacts(prev => prev.filter(x => x.id !== c.id));
+                      }} className="text-gray-300 hover:text-red-500 text-lg leading-none flex-shrink-0">
+                        🗑
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* הוספה */}
+                  <div className="bg-indigo-50 rounded-xl p-3 space-y-2">
+                    <p className="text-xs font-medium text-indigo-700">+ הוסף איש קשר</p>
+                    <input placeholder="שם" value={newCName} onChange={e => setNewCName(e.target.value)}
+                      className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+                    <input placeholder="מספר טלפון" value={newCPhone} onChange={e => setNewCPhone(e.target.value)}
+                      dir="ltr"
+                      className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+                    <button disabled={addingC || !newCName.trim() || !newCPhone.trim()}
+                      onClick={async () => {
+                        setAddingC(true);
+                        const phone = newCPhone.replace(/\D/g,'');
+                        const c = { id: phone, name: newCName.trim(), phone };
+                        await contactUpsert(c);
+                        setContacts(prev => [...prev, c].sort((a,b) => a.name.localeCompare(b.name, 'he')));
+                        setNewCName(''); setNewCPhone(''); setAddingC(false);
+                      }}
+                      className="w-full py-2 bg-indigo-500 text-white rounded-lg text-sm
+                                 font-medium hover:bg-indigo-600 disabled:opacity-50 transition-colors">
+                      {addingC ? 'שומר...' : 'הוסף'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+
+            <hr className="my-4 border-gray-100" />
+
+            {/* מחסנים */}
+            <div className="mb-2">
+              <button onClick={() => setShowWarehouses(v => !v)}
+                className="w-full flex items-center justify-between text-sm font-semibold
+                           text-gray-700 py-2">
+                <span>🏭 מחסנים ({warehouses.length})</span>
+                <span className="text-gray-400 text-xs">{showWarehouses ? '▲' : '▼'}</span>
+              </button>
+
+              {showWarehouses && (
+                <div className="mt-2 space-y-2">
+                  {warehouses.map((w, idx) => (
+                    <div key={w.key} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                      <span className="text-lg">🏭</span>
+                      <span className="flex-1 text-sm font-medium text-gray-800">{w.label}</span>
+                      {warehouses.length > 1 && (
+                        <button onClick={() => {
+                          const updated = warehouses.filter((_, i) => i !== idx);
+                          onSaveWarehouses(updated);
+                          setMsg('✅ מחסן הוסר');
+                          setTimeout(() => setMsg(''), 2000);
+                        }} className="text-gray-300 hover:text-red-500 text-lg leading-none">
+                          🗑
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* הוספת מחסן חדש */}
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="text"
+                      placeholder="שם מחסן חדש..."
+                      value={newWhLabel}
+                      onChange={e => setNewWhLabel(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newWhLabel.trim()) {
+                          const key = newWhLabel.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
+                          onSaveWarehouses([...warehouses, { key, label: newWhLabel.trim() }]);
+                          setNewWhLabel('');
+                          setMsg('✅ מחסן נוסף!');
+                          setTimeout(() => setMsg(''), 2000);
+                        }
+                      }}
+                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    />
+                    <button
+                      onClick={() => {
+                        if (!newWhLabel.trim()) return;
+                        const key = newWhLabel.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
+                        onSaveWarehouses([...warehouses, { key, label: newWhLabel.trim() }]);
+                        setNewWhLabel('');
+                        setMsg('✅ מחסן נוסף!');
+                        setTimeout(() => setMsg(''), 2000);
+                      }}
+                      className="px-3 py-2 bg-indigo-500 text-white rounded-xl text-sm
+                                 font-medium hover:bg-indigo-600 transition-colors">
+                      ➕
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* שינוי סיסמה */}
+            <form onSubmit={changePw} className="space-y-3">
+              <p className="text-sm font-medium text-gray-700">שינוי סיסמה</p>
+              <input type="password" placeholder="סיסמה חדשה" value={newPw}
+                onChange={e => setNewPw(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              <input type="password" placeholder="אשר סיסמה" value={conf}
+                onChange={e => setConf(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              {msg && <p className="text-sm">{msg}</p>}
+              <button type="submit"
+                className="w-full py-2.5 rounded-xl bg-indigo-500 text-white text-sm
+                           font-semibold hover:bg-indigo-600 transition-colors">
+                עדכן סיסמה
+              </button>
+            </form>
+
+            <hr className="my-5 border-gray-100" />
+
+            <button onClick={onLogout}
+              className="w-full py-2.5 rounded-xl border border-red-200 text-red-500 text-sm
+                         font-medium hover:bg-red-50 transition-colors">
+              🚪 התנתקות
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // קומפוננטה ראשית: App
+    // ─────────────────────────────────────────
+    function App() {
+      const [loggedIn,    setLoggedIn]    = useState(false);
+      const [products,    setProducts]    = useState([]);
+      const [selectedIds, setSelectedIds] = useState(new Set());
+      const [category,    setCategory]    = useState('all');
+      const [availOnly,   setAvailOnly]   = useState(false);
+      const [query,       setQuery]       = useState('');
+      const [adminMode,   setAdminMode]   = useState(false);
+      const [menuOpen,    setMenuOpen]    = useState(false);
+      const [showWA,      setShowWA]      = useState(false);
+      const [showForm,    setShowForm]    = useState(false);
+      const [editProduct, setEditProduct] = useState(null);
+      const [showSettings,setShowSettings]= useState(false);
+      const [categories,  setCategories]  = useState([]);
+      const [warehouses,  setWarehouses]  = useState(DEFAULT_WAREHOUSES);
+      const [showAddCategory, setShowAddCategory] = useState(false);
+      const [draggedProduct, setDraggedProduct] = useState(null);
+      const [syncStatus, setSyncStatus] = useState('ok'); // ok | syncing | error
+      const [logoUrl,     setLogoUrl]     = useState('');
+      const [showPricing, setShowPricing] = useState(false);
+      const [initialLoading, setInitialLoading] = useState(true); // מחכה לטעינה ראשונית מהענן
+
+      // פונקציה לטעינת נתוני ענן ועדכון state
+      const applyCloudData = (data) => {
+        if (data && data.products && data.products.length > 0) {
+          setProducts(data.products);
+          persistProducts(data.products);
+          const cloudCats = data.categories && data.categories.length > 0 ? data.categories : CATEGORIES;
+          setCategories(cloudCats);
+          localStorage.setItem('kshop_categories', JSON.stringify(cloudCats));
+          const cloudWhs = data.warehouses && data.warehouses.length > 0 ? data.warehouses : DEFAULT_WAREHOUSES;
+          setWarehouses(cloudWhs);
+          localStorage.setItem('kshop_warehouses', JSON.stringify(cloudWhs));
+          if (data.whatsappNumber) localStorage.setItem('kshop_whatsapp_number', data.whatsappNumber);
+          if (data.logoUrl) setLogoUrl(data.logoUrl);
+        }
+      };
+
+      useEffect(() => {
+        // ── טען מהענן תמיד ראשון — הענן הוא מקור האמת ──────────────
+        setSyncStatus('syncing');
+        cloudLoad().then(data => {
+          applyCloudData(data);
+          cloudDataLoaded = true; // רק עכשיו מותר לשמור
+          setSyncStatus('ok');
+          setInitialLoading(false);
+        }).catch(() => {
+          // אם הענן נכשל — טען מ-localStorage כגיבוי
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) { try { setProducts(JSON.parse(saved)); } catch {} }
+          setCategories(CATEGORIES);
+          cloudDataLoaded = true;
+          setSyncStatus('error');
+          setInitialLoading(false);
+        });
+
+        // ── שחזר session קיים של Supabase Auth ──────────────
+        db.auth.getSession().then(({ data: { session } }) => {
+          if (session) { setLoggedIn(true); setAdminMode(true); }
+        });
+
+        // הקשב לשינויי auth (login/logout)
+        const { data: { subscription } } = db.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_OUT' || !session) {
+            setLoggedIn(false);
+            setAdminMode(false);
+          } else if (session) {
+            setLoggedIn(true);
+          }
+        });
+
+        return () => subscription.unsubscribe();
+      }, []);
+
+      const save = (list) => { setProducts(list); persistProducts(list); debouncedCloudSave(list); };
+
+      const saveCategories = (cats) => {
+        setCategories(cats);
+        localStorage.setItem('kshop_categories', JSON.stringify(cats));
+        debouncedCloudSave(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'), cats);
+      };
+
+      const saveWarehouses = async (whs) => {
+        setWarehouses(whs);
+        localStorage.setItem('kshop_warehouses', JSON.stringify(whs));
+        const { data: { session } } = await db.auth.getSession();
+        if (session) {
+          db.from('app_settings').upsert({ key: 'warehouses', value: JSON.stringify(whs) }, { onConflict: 'key' });
+        }
+      };
+
+      const saveLogo = async (b64) => {
+        setLogoUrl(b64);
+        try {
+          const { data: { session } } = await db.auth.getSession();
+          if (session) {
+            await db.from('app_settings').upsert({ key: 'logoUrl', value: JSON.stringify(b64) }, { onConflict: 'key' });
+          }
+        } catch(e) { console.error('logo save error', e.message); }
+      };
+
+      const addCategory = (key, label) => {
+        if (!categories.some(c => c.key === key)) {
+          saveCategories([...categories, { key, label }]);
+        }
+      };
+
+      const openAdminMode = () => {
+        setAdminMode(true);
+      };
+
+      const exitAdminMode = () => {
+        // חזרה לתצוגת לקוח — session נשמר
+        setAdminMode(false);
+        setSelectedIds(new Set());
+        setMenuOpen(false);
+      };
+
+      const getWhatsAppNumber = () => {
+        return localStorage.getItem('kshop_whatsapp_number') || '972509933322';
+      };
+
+      // פתיחת וואטסאפ ישירה ללקוח (בלי מודל)
+      const openCustomerWA = () => {
+        const sel = products.filter(p => selectedIds.has(p.id));
+        if (sel.length === 0) return;
+        const text = buildWhatsAppText(sel);
+        const num  = getWhatsAppNumber();
+        window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(text), '_blank');
+      };
+
+      // ── סינון ──
+      const filtered = products.filter(p => {
+        if (category !== 'all' && p.category !== category) return false;
+        if (availOnly && productStatus(p).key === 'out')   return false;
+        if (query) {
+          const q = query.toLowerCase();
+          if (!p.name.toLowerCase().includes(q) && !(p.dimensions || '').toLowerCase().includes(q))
+            return false;
+        }
+        return true;
+      });
+
+      const selectedProducts = products.filter(p => selectedIds.has(p.id));
+
+      const toggleSelect = (id) => {
+        setSelectedIds(prev => {
+          const n = new Set(prev);
+          n.has(id) ? n.delete(id) : n.add(id);
+          return n;
+        });
+      };
+
+      const handleSave = (form) => {
+        const exists = products.some(p => p.id === form.id);
+        save(exists ? products.map(p => p.id === form.id ? form : p) : [...products, form]);
+        setShowForm(false); setEditProduct(null);
+      };
+
+      const handleDelete = (id) => {
+        cloudDeleteProduct(id); // מחק מהענן במפורש
+        save(products.filter(p => p.id !== id));
+        setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+        setShowForm(false); setEditProduct(null);
+      };
+
+      const handleQuantityChange = (id, delta, warehouseKey = null) => {
+        save(products.map(p => {
+          if (p.id !== id) return p;
+          const newTotal = Math.max(0, (p.quantity || 0) + delta);
+          if (warehouseKey) {
+            const wqty = getWqty(p);
+            const newWqty = { ...wqty, [warehouseKey]: Math.max(0, (wqty[warehouseKey] || 0) + delta) };
+            return { ...p, quantity: newTotal, warehouse_qty: JSON.stringify(newWqty) };
+          }
+          return { ...p, quantity: newTotal };
+        }));
+      };
+
+      const openEdit = (product) => { setEditProduct(product); setShowForm(true); };
+      const openNew  = ()         => { setEditProduct(null);   setShowForm(true); };
+      const logout   = async ()   => {
+        await db.auth.signOut();   // מחיקת session Supabase
+        setLoggedIn(false);
+        setAdminMode(false);
+        setMenuOpen(false);
+        setShowSettings(false);
+        setSelectedIds(new Set());
+      };
+
+      // מסך טעינה ראשונית — מחכה שהענן יחזיר נתונים לפני כל הצגה
+      if (initialLoading) return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-5xl mb-4">🛒</div>
+            <div className="text-gray-500 text-lg font-medium">K-Shop</div>
+            <div className="text-gray-400 text-sm mt-2">טוען נתונים...</div>
+            <div className="mt-4 flex justify-center gap-1">
+              {[0,1,2].map(i => (
+                <div key={i} className="w-2 h-2 rounded-full bg-indigo-300 animate-bounce"
+                     style={{animationDelay: `${i*0.15}s`}} />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+
+      // If admin login required and not logged in, show login
+      const needsAdminLogin = loggedIn === false && adminMode === true;
+      if (needsAdminLogin) return (
+        <LoginPage onLogin={(user) => {
+          setLoggedIn(true);
+          setAdminMode(true);
+          // טען מחדש את הנתונים מהענן אחרי כניסה
+          setSyncStatus('syncing');
+          cloudLoad().then(data => {
+            applyCloudData(data);
+            setSyncStatus('ok');
+          }).catch(() => setSyncStatus('error'));
+        }} />
+      );
+
+      // Dragging handlers
+      const handleDragStart = (e, product) => {
+        setDraggedProduct(product);
+        e.dataTransfer.effectAllowed = 'move';
+      };
+
+      const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      };
+
+      const handleDrop = (e, targetProduct) => {
+        e.preventDefault();
+        if (!draggedProduct || draggedProduct.id === targetProduct.id) {
+          setDraggedProduct(null);
+          return;
+        }
+
+        // Reorder products by swapping indices
+        const draggedIdx = products.findIndex(p => p.id === draggedProduct.id);
+        const targetIdx = products.findIndex(p => p.id === targetProduct.id);
+        if (draggedIdx === -1 || targetIdx === -1) {
+          setDraggedProduct(null);
+          return;
+        }
+
+        const newProducts = [...products];
+        [newProducts[draggedIdx], newProducts[targetIdx]] = [newProducts[targetIdx], newProducts[draggedIdx]];
+        save(newProducts);
+        setDraggedProduct(null);
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-50" style={{ direction: 'rtl' }}>
+
+          {/* ── Header ── */}
+          <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
+            <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🎪</span>
+                <div className="leading-tight">
+                  <span className="font-bold text-gray-800 text-lg block">K-Shop</span>
+                  <span className="text-xs text-gray-400">{adminMode ? 'מצב ניהול' : 'תצוגת לקוח'}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* כפתורי ענן – ניהול */}
+                {adminMode && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        setSyncStatus('syncing');
+                        try {
+                          const prods    = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+                          const savedCats = JSON.parse(localStorage.getItem('kshop_categories') || '[]');
+                          const cats     = savedCats.length > 0 ? savedCats : CATEGORIES;
+                          await cloudSave({ products: prods, categories: cats, whatsappNumber: localStorage.getItem('kshop_whatsapp_number') || '972509933322' });
+                          setSyncStatus('ok');
+                        } catch(e) {
+                          setSyncStatus('error');
+                          alert('שגיאת שמירה: ' + e.message);
+                        }
+                      }}
+                      title="שמור לענן"
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors
+                        ${syncStatus === 'syncing' ? 'bg-yellow-50 border-yellow-300 text-yellow-600' :
+                          syncStatus === 'error'   ? 'bg-red-50 border-red-300 text-red-600' :
+                          'bg-green-50 border-green-300 text-green-700 hover:bg-green-100'}`}>
+                      {syncStatus === 'syncing' ? '⏳' : syncStatus === 'error' ? '⚠️' : '☁️'}
+                      {syncStatus === 'syncing' ? 'שומר...' : syncStatus === 'error' ? 'שגיאה' : 'שמור'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setSyncStatus('syncing');
+                        try {
+                          const data = await cloudLoad();
+                          if (data && data.products && data.products.length > 0) {
+                            persistProducts(data.products);
+                            setProducts(data.products);
+                            if (data.categories) {
+                              setCategories(data.categories);
+                              localStorage.setItem('kshop_categories', JSON.stringify(data.categories));
+                            }
+                            setSyncStatus('ok');
+                          } else {
+                            setSyncStatus('error');
+                            alert('הענן ריק – שמור קודם ממחשב אחר');
+                          }
+                        } catch(e) {
+                          setSyncStatus('error');
+                          alert('שגיאת טעינה: ' + e.message);
+                        }
+                      }}
+                      title="טען מהענן"
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
+                      🔄 טען
+                    </button>
+                  </>
+                )}
+                {/* כפתור מוצר חדש – ניהול */}
+                {adminMode && (
+                  <button onClick={openNew}
+                    className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold
+                               px-3 py-1.5 rounded-xl transition-colors">
+                    + מוצר
+                  </button>
+                )}
+
+                {/* תפריט הגדרות / ניהול */}
+                {!adminMode ? (
+                  <button onClick={openAdminMode}
+                    className="text-sm text-gray-500 hover:text-indigo-600 transition-colors px-2 py-1">
+                    ניהול 🔑
+                  </button>
+                ) : (
+                  <div className="relative">
+                    <button onClick={() => setMenuOpen(v => !v)}
+                      className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center
+                                 justify-center text-base transition-colors">
+                      ⚙️
+                    </button>
+                    {menuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                        <div className="absolute left-0 top-11 bg-white rounded-2xl shadow-xl
+                                        border border-gray-100 py-2 min-w-[180px] z-20">
+                          <button onClick={() => { exitAdminMode(); setMenuOpen(false); }}
+                            className="w-full text-right px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors">
+                            👁️ תצוגת לקוח
+                          </button>
+                          <button onClick={() => { setShowSettings(true); setMenuOpen(false); }}
+                            className="w-full text-right px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors">
+                            🔑 הגדרות וסיסמה
+                          </button>
+                          <hr className="my-1 border-gray-100" />
+                          <button onClick={() => { exitAdminMode(); setMenuOpen(false); }}
+                            className="w-full text-right px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
+                            🚪 יציאה
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* ── Filters ── */}
+          <div className="bg-white border-b border-gray-100">
+            <div className="max-w-4xl mx-auto px-4 py-3 space-y-3">
+
+              {/* חיפוש */}
+              <div className="relative">
+                <input type="text" placeholder="🔍 חיפוש מוצר..."
+                  value={query} onChange={e => setQuery(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm
+                             focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+                {query && (
+                  <button onClick={() => setQuery('')}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* קטגוריות */}
+              <CategoryFilter
+                active={category}
+                onChange={setCategory}
+                categories={categories}
+                adminMode={adminMode}
+                onAddCategory={() => setShowAddCategory(true)}
+              />
+
+              {/* זמין בלבד + מונה */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setAvailOnly(v => !v)}
+                  className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-full border
+                    transition-colors
+                    ${availOnly
+                      ? 'bg-green-500 text-white border-green-500'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-green-400'}`}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${availOnly ? 'bg-white' : 'bg-gray-300'}`} />
+                  זמין בלבד
+                </button>
+                <span className="text-xs text-gray-400">
+                  {filtered.length} מוצרים
+                  {selectedIds.size > 0 && ` · ${selectedIds.size} נבחרו`}
+                </span>
+                {selectedIds.size > 0 && (
+                  <button onClick={() => setSelectedIds(new Set())}
+                    className="text-xs text-gray-400 hover:text-red-500 transition-colors mr-auto">
+                    נקה בחירה
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Product Grid ── */}
+          <main className="max-w-4xl mx-auto p-4 pb-32">
+            {filtered.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="text-7xl mb-4">🎈</div>
+                <p className="text-gray-400 font-medium text-lg">
+                  {products.length === 0 ? 'אין מוצרים עדיין' : 'לא נמצאו מוצרים'}
+                </p>
+                {products.length === 0 && adminMode && (
+                  <button onClick={openNew}
+                    className="mt-5 bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3
+                               rounded-xl font-semibold transition-colors">
+                    ➕ הוסף מוצר ראשון
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {filtered.map(p => (
+                  <ProductCard
+                    warehouses={warehouses}
+                    key={p.id}
+                    product={p}
+                    selected={selectedIds.has(p.id)}
+                    onToggle={toggleSelect}
+                    adminMode={adminMode}
+                    onEdit={openEdit}
+                    onQuantityChange={handleQuantityChange}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                  />
+                ))}
+              </div>
+            )}
+          </main>
+
+          {/* ── Bottom bar (כשיש בחירה) ── */}
+          {selectedIds.size > 0 && (
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20
+                            shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+              <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  title="בטל בחירה"
+                  className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full
+                             bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500
+                             transition-colors text-lg font-bold">
+                  ✕
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-800 text-sm">
+                    {selectedIds.size} מוצרים נבחרו
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {selectedProducts.map(p => p.name).join('  ·  ')}
+                  </p>
+                </div>
+                {adminMode && (
+                  <button
+                    onClick={() => setShowPricing(true)}
+                    className="flex-shrink-0 bg-[#cc0000] hover:bg-[#aa0000] text-white px-4 py-3
+                               rounded-xl font-bold text-sm flex items-center gap-2 shadow-md
+                               transition-colors">
+                    📄 מחירון
+                  </button>
+                )}
+                <button
+                  onClick={adminMode ? () => setShowWA(true) : openCustomerWA}
+                  className="flex-shrink-0 bg-[#25D366] hover:bg-[#20c05c] text-white px-5 py-3
+                             rounded-xl font-bold text-sm flex items-center gap-2 shadow-md
+                             transition-colors">
+                  📱 {adminMode ? 'שלח בוואטסאפ' : 'שלח לנו וואטסאפ'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Customer Mode Footer (הנחיה לבחור מוצרים) ── */}
+          {!adminMode && selectedIds.size === 0 && (
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20
+                            shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+              <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-center gap-3">
+                <p className="text-gray-400 text-sm">בחר מוצרים ולחץ "שלח לנו וואטסאפ"</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Modals ── */}
+          {showWA && (
+            <WhatsAppModal
+              products={selectedProducts}
+              onClose={() => setShowWA(false)}
+              isCustomerMode={!adminMode}
+            />
+          )}
+          {showForm && (
+            <ProductForm
+              product={editProduct}
+              onSave={handleSave}
+              onCancel={() => { setShowForm(false); setEditProduct(null); }}
+              onDelete={handleDelete}
+              warehouses={warehouses}
+            />
+          )}
+          {showAddCategory && (
+            <AddCategoryModal
+              onClose={() => setShowAddCategory(false)}
+              onAdd={addCategory}
+            />
+          )}
+          {showSettings && (
+            <SettingsModal onClose={() => setShowSettings(false)} onLogout={logout} warehouses={warehouses} onSaveWarehouses={saveWarehouses} logoUrl={logoUrl} onSaveLogo={saveLogo} />
+          )}
+          {showPricing && (
+            <PricingModal
+              products={selectedProducts}
+              logoUrl={logoUrl}
+              categories={categories}
+              onClose={() => setShowPricing(false)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

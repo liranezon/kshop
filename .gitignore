@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+.AppleDouble
+
+# Editor
+.vscode/
+*.swp
+*.swo
+
+# Temp / backups
+*.zip
+*.bak
+node_modules/
+.env

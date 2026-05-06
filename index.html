@@ -618,7 +618,7 @@
 
       const fetchQR = async () => {
         try {
-          const r = await fetch(serverUrl + '/qr', { signal: AbortSignal.timeout(8000), headers: { 'ngrok-skip-browser-warning': 'true' } });
+          const r = await fetch(serverUrl + '/qr', { signal: AbortSignal.timeout(8000), headers: { 'ngrok-skip-browser-warning': 'true', 'x-kshop-token': getToken() } });
           const d = await r.json();
           if (d.status === 'ready') { clearInterval(pollRef.current); onConnected(); return; }
           if (d.qr) { setQrImg(d.qr); setLoading(false); }
@@ -884,6 +884,8 @@
     // קומפוננטה: WhatsAppModal
     // ─────────────────────────────────────────
     // SERVER URL – saved in localStorage (synced from Supabase on load)
+    const getToken  = () => localStorage.getItem('kshop_api_token') || '';
+
     const getServer = () =>
       localStorage.getItem('kshop_server_url') ||
       (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -909,7 +911,7 @@
       // בדוק אם השרת רץ
       useEffect(() => {
         if (!srv) { setServerStatus('no_server'); return; }
-        fetch(srv + '/status', { signal: AbortSignal.timeout(6000), headers: { 'ngrok-skip-browser-warning': 'true' } })
+        fetch(srv + '/status', { signal: AbortSignal.timeout(6000), headers: { 'ngrok-skip-browser-warning': 'true', 'x-kshop-token': getToken() } })
           .then(r => r.json())
           .then(d => setServerStatus(d.status === 'ready' ? 'ready' : d.status === 'qr' ? 'qr' : 'disconnected'))
           .catch(() => setServerStatus('disconnected'));
@@ -932,7 +934,7 @@
         try {
           const resp = await fetch(srv + '/send', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+            headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', 'x-kshop-token': getToken() },
             body: JSON.stringify({ phone, text, images }),
           });
           const data = await resp.json();
@@ -1061,7 +1063,7 @@
                   <p className="text-orange-600 text-xs">
                     {!getServer()
                       ? 'הגדר כתובת שרת בהגדרות (⚙️) כדי לשלוח אוטומטית.'
-                      : 'וודא שהשרת ב-Railway פועל, ורענן את הדף.'}
+                      : 'וודא שמחשב המשרד דלוק וה-ngrok פועל, ורענן את הדף.'}
                   </p>
                 </div>
 
@@ -1532,6 +1534,7 @@
       const [msg, setMsg]     = useState('');
       const [whatsappNum, setWhatsappNum] = useState(() => localStorage.getItem('kshop_whatsapp_number') || '972509933322');
       const [serverUrl, setServerUrl] = useState(() => localStorage.getItem('kshop_server_url') || '');
+      const [apiToken,   setApiToken]   = useState(() => localStorage.getItem('kshop_api_token')  || '');
       const [contacts, setContacts]   = useState([]);
       const [newCName, setNewCName]   = useState('');
       const [newCPhone, setNewCPhone] = useState('');
@@ -1620,10 +1623,10 @@
             {/* כתובת שרת וואטסאפ */}
             <div className="bg-indigo-50 rounded-xl p-4 mb-4 space-y-2">
               <p className="text-sm font-semibold text-indigo-700">🌐 כתובת שרת וואטסאפ</p>
-              <p className="text-xs text-indigo-500">הכתובת שקיבלת מ-Railway (לדוגמה: https://kshop-wa.up.railway.app)</p>
+              <p className="text-xs text-indigo-500">הכתובת של ngrok (לדוגמה: https://landmine-thumb-stegosaur.ngrok-free.app)</p>
               <input
                 type="url"
-                placeholder="https://xxxx.up.railway.app"
+                placeholder="https://xxxx.ngrok-free.app"
                 value={serverUrl}
                 onChange={e => setServerUrl(e.target.value)}
                 dir="ltr"
@@ -1645,6 +1648,30 @@
                 className="w-full py-2 rounded-xl bg-indigo-500 text-white text-sm
                            font-medium hover:bg-indigo-600 transition-colors">
                 💾 שמור כתובת
+              </button>
+            </div>
+
+            {/* 🔑 Token אבטחה */}
+            <div className="bg-red-50 rounded-xl p-4 mb-4 space-y-2">
+              <p className="text-sm font-semibold text-red-700">🔑 קוד אבטחה (API Token)</p>
+              <p className="text-xs text-red-500">מופיע בחלון השרת בעת ההפעלה – העתק אותו לכאן</p>
+              <input
+                type="text"
+                placeholder="הדבק כאן את ה-Token מחלון השרת"
+                value={apiToken}
+                onChange={e => setApiToken(e.target.value)}
+                dir="ltr"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono
+                           focus:outline-none focus:ring-2 focus:ring-red-300"
+              />
+              <button onClick={() => {
+                localStorage.setItem('kshop_api_token', apiToken.trim());
+                setMsg('✅ Token נשמר!');
+                setTimeout(() => setMsg(''), 2500);
+              }}
+                className="w-full py-2 rounded-xl bg-red-500 text-white text-sm
+                           font-medium hover:bg-red-600 transition-colors">
+                💾 שמור Token
               </button>
             </div>
 
@@ -1693,7 +1720,7 @@
                         setMsg('⏳ מייבא מוואטסאפ...');
                         try {
                           const r = await fetch(srv + '/contacts', {
-                            headers: { 'ngrok-skip-browser-warning': 'true' }
+                            headers: { 'ngrok-skip-browser-warning': 'true', 'x-kshop-token': getToken() }
                           });
                           const data = await r.json();
                           const incoming = data.contacts || [];

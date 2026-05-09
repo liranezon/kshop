@@ -10,5 +10,14 @@
 # Temp / backups
 *.zip
 *.bak
+
+# Node
 node_modules/
+npm-debug.log*
+
+# WhatsApp session (לא לשמור בgit – כל מחשב מחובר בנפרד)
+ww-session/
+
+# Secret files
 .env
+api-token.txt

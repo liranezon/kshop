@@ -41,7 +41,7 @@
 ## Cloudflare
 
 - Account ID: 6b2632ec4dcb56f740c3ed94537cdb81
-- API Token: cfut_RDPUbg7yQIglAfFSr9W9KCRdcLAO0CAzwwYndnxZ6294e85b
+- API Token: [שמור בנפרד — לא בקוד]
 - Pages project name: kshop
 - Worker name: mute-mountain-de5c
 

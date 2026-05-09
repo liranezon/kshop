@@ -9,6 +9,8 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; background: #f8fafc; }
@@ -1376,155 +1378,273 @@
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
 
+    const DEFAULT_CLAUSES = [
+      { id: 'c1', text: 'המחירים באיסוף עצמי מהוד השרון', enabled: true },
+      { id: 'c2', text: 'ההצעה בתוקף ל-7 ימים', enabled: true },
+      { id: 'c3', text: 'משלוח בתאום מראש בתוספת עלות', enabled: false },
+      { id: 'c4', text: 'תשלום מראש נדרש להזמנה', enabled: false },
+      { id: 'c5', text: 'המחירים כוללים מע"מ', enabled: false },
+    ];
+
     // ─────────────────────────────────────────
     function PricingModal({ products, logoUrl, categories = [], onClose }) {
-      // מחיר לכל מוצר: { [id]: string }
       const [prices, setPrices] = useState(() => {
         const init = {};
         products.forEach(p => { init[p.id] = p.price ? String(p.price) : ''; });
         return init;
       });
+      const [vatEnabled, setVatEnabled] = useState(false);
+      const [clauses, setClauses] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('kshop_pdf_clauses')) || DEFAULT_CLAUSES; }
+        catch { return DEFAULT_CLAUSES; }
+      });
+      const [newClause, setNewClause] = useState('');
+      const [showWaSend, setShowWaSend] = useState(false);
+      const [waPhone, setWaPhone] = useState(() => localStorage.getItem('kshop_whatsapp_number') || '');
+      const [sendingWA, setSendingWA] = useState(false);
+      const [waDone, setWaDone] = useState(false);
+      const [waError, setWaError] = useState('');
+
+      useEffect(() => {
+        localStorage.setItem('kshop_pdf_clauses', JSON.stringify(clauses));
+      }, [clauses]);
 
       const today = new Date().toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const phone = localStorage.getItem('kshop_whatsapp_number') || '972509933322';
-      // Format phone for display: 972XXXXXXXXX → 05X-XXXXXXX
       const displayPhone = (() => {
         const d = phone.replace(/\D/g, '');
-        if (d.startsWith('972')) {
-          const local = '0' + d.slice(3);
-          return local.slice(0, 3) + '-' + local.slice(3);
-        }
+        if (d.startsWith('972')) { const l = '0' + d.slice(3); return l.slice(0,3) + '-' + l.slice(3); }
         return phone;
       })();
 
-      const doPrint = () => {
-        // Group products by category
+      const calcPrice = (raw) => {
+        const n = parseFloat(raw);
+        if (isNaN(n) || raw === '') return '';
+        return vatEnabled ? Math.round(n * 1.18) : Math.round(n);
+      };
+
+      const buildCatalog = () => {
         const catMap = {};
         products.forEach(p => {
           const key = p.category || '__none__';
           if (!catMap[key]) catMap[key] = [];
           catMap[key].push(p);
         });
-
-        // Build category label lookup
         const catLabel = {};
         categories.forEach(c => { catLabel[c.key] = c.label; });
 
-        // Build table rows HTML
         let rowsHtml = '';
         Object.entries(catMap).forEach(([catKey, prods]) => {
           const label = catLabel[catKey] || (catKey === '__none__' ? '' : catKey);
-          if (label) {
-            rowsHtml += `<tr class="pc-cat-row"><td colspan="4">${escHtml(label)}</td></tr>`;
-          }
+          if (label) rowsHtml += '<tr class="pc-cat-row"><td colspan="4">' + escHtml(label) + '</td></tr>';
           prods.forEach(p => {
-            const price  = prices[p.id];
-            // escHtml מגן מ-XSS בכל ערך שבא ממשתמש
-            const safeName  = escHtml(p.name);
-            const safeDims  = escHtml(p.dimensions || '—');
-            const safePrice = escHtml(price || '');
-            const safeImg   = escHtml(p.image || '');
-            const imgTag = safeImg
-              ? `<img src="${safeImg}" class="pc-row-img" alt="${safeName}" />`
-              : `<div class="pc-row-img-placeholder">🎈</div>`;
+            const price    = calcPrice(prices[p.id]);
+            const safeName = escHtml(p.name);
+            const safeDims = escHtml(p.dimensions || '—');
+            const safePrice = escHtml(price !== '' ? String(price) : '');
+            const safeImg  = escHtml(p.image || '');
+            const imgTag   = safeImg
+              ? '<img src="' + safeImg + '" class="pc-row-img" alt="' + safeName + '" />'
+              : '<div class="pc-row-img-placeholder">&#x1F388;</div>';
             const priceCell = safePrice
-              ? `<td class="pc-price-cell"><span class="pc-price-label">ש"ח</span><span class="pc-price-num">${safePrice}</span></td>`
-              : `<td class="pc-price-cell"><span class="pc-price-empty">—</span></td>`;
-            rowsHtml += `
-              <tr class="pc-row">
-                <td style="text-align:center">${imgTag}</td>
-                <td><div class="pc-row-name">${safeName}</div></td>
-                <td class="pc-row-dims">${safeDims}</td>
-                ${priceCell}
-              </tr>`;
+              ? '<td class="pc-price-cell"><span class="pc-price-label">&#x05E9;"&#x05D7;</span><span class="pc-price-num">' + safePrice + '</span></td>'
+              : '<td class="pc-price-cell"><span class="pc-price-empty">—</span></td>';
+            rowsHtml += '<tr class="pc-row"><td style="text-align:center">' + imgTag + '</td><td><div class="pc-row-name">' + safeName + '</div></td><td class="pc-row-dims">' + safeDims + '</td>' + priceCell + '</tr>';
           });
         });
 
-        const logoHtml = logoUrl
-          ? `<img src="${logoUrl}" class="pc-logo-img" alt="לוגו" />`
-          : `<div class="pc-logo-wrap" style="display:flex;align-items:center;gap:4px"><span class="pc-logo-k">K</span><span class="pc-logo-s">shop</span></div>`;
+        const enabledClauses = clauses.filter(c => c.enabled);
+        const clausesHtml = enabledClauses.length
+          ? '<div style="margin-top:10px;padding:8px 14px;font-size:11px;color:#555;direction:rtl;">' +
+            enabledClauses.map(c => '<div style="margin-bottom:3px;">• ' + escHtml(c.text) + '</div>').join('') +
+            '</div>'
+          : '';
 
-        const catalog = document.getElementById('kshop-print-catalog');
-        catalog.innerHTML = `
-          <div class="pc-wrap">
-            <div class="pc-header">
-              <div class="pc-logo-wrap">${logoHtml}</div>
-              <div class="pc-header-title">
-                <div class="pc-catalog-title">קיי שופ און ליין בע״מ — מחירון מיוחד</div>
-                <div class="pc-catalog-date">${today}</div>
-              </div>
-            </div>
-            <table class="pc-table">
-              <thead>
-                <tr>
-                  <th class="col-img">תמונה</th>
-                  <th>שם מוצר</th>
-                  <th>מידות</th>
-                  <th class="col-price">מחיר (ש"ח)</th>
-                </tr>
-              </thead>
-              <tbody>${rowsHtml}</tbody>
-            </table>
-            <div class="pc-footer">לפרטים והזמנות: <strong>${displayPhone}</strong></div>
-          </div>
-        `;
-        window.print();
+        const logoHtml = logoUrl
+          ? '<img src="' + logoUrl + '" class="pc-logo-img" alt="logo" />'
+          : '<div class="pc-logo-wrap" style="display:flex;align-items:center;gap:4px"><span class="pc-logo-k">K</span><span class="pc-logo-s">shop</span></div>';
+
+        document.getElementById('kshop-print-catalog').innerHTML =
+          '<div class="pc-wrap">' +
+            '<div class="pc-header">' +
+              '<div class="pc-logo-wrap">' + logoHtml + '</div>' +
+              '<div class="pc-header-title">' +
+                '<div class="pc-catalog-title">&#x05E7;&#x05D9;&#x05D9; &#x05E9;&#x05D5;&#x05E4; &#x05D0;&#x05D5;&#x05DF; &#x05DC;&#x05D9;&#x05D9;&#x05DF; &#x05D1;&#x05E2;&#x05DE; — &#x05DE;&#x05D7;&#x05D9;&#x05E8;&#x05D5;&#x05DF; &#x05DE;&#x05D9;&#x05D5;&#x05D7;&#x05D3;</div>' +
+                '<div class="pc-catalog-date">' + today + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<table class="pc-table">' +
+              '<thead><tr>' +
+                '<th class="col-img">&#x05EA;&#x05DE;&#x05D5;&#x05E0;&#x05D4;</th>' +
+                '<th>&#x05E9;&#x05DD; &#x05DE;&#x05D5;&#x05E6;&#x05E8;</th>' +
+                '<th>&#x05DE;&#x05D9;&#x05D3;&#x05D5;&#x05EA;</th>' +
+                '<th class="col-price">&#x05DE;&#x05D7;&#x05D9;&#x05E8; (&#x05E9;"&#x05D7;)</th>' +
+              '</tr></thead>' +
+              '<tbody>' + rowsHtml + '</tbody>' +
+            '</table>' +
+            clausesHtml +
+            '<div class="pc-footer">&#x05DC;&#x05E4;&#x05E8;&#x05D8;&#x05D9;&#x05DD; &#x05D5;&#x05D4;&#x05D6;&#x05DE;&#x05E0;&#x05D5;&#x05EA;: <strong>' + displayPhone + '</strong></div>' +
+          '</div>';
       };
+
+      const doPrint = () => { buildCatalog(); window.print(); };
+
+      const sendToWA = async () => {
+        if (!waPhone.trim()) { setWaError('הזן מספר טלפון'); return; }
+        const srv   = getServer();
+        const token = getToken();
+        if (!srv) { setWaError('הגדר כתובת שרת בהגדרות'); return; }
+        setSendingWA(true); setWaError('');
+        buildCatalog();
+        try {
+          const el = document.getElementById('kshop-print-catalog');
+          const canvas = await window.html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#fff' });
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+          const imgData = canvas.toDataURL('image/jpeg', 0.92);
+          const pdfW = pdf.internal.pageSize.getWidth();
+          const pdfH = (canvas.height * pdfW) / canvas.width;
+          pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, Math.min(pdfH, pdf.internal.pageSize.getHeight()));
+          const pdfBase64 = pdf.output('datauristring');
+          const resp = await fetch(srv + '/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-kshop-token': token, 'ngrok-skip-browser-warning': 'true' },
+            body: JSON.stringify({ phone: waPhone, text: '📋 מחירון מצורף', images: [{ name: 'מחירון.pdf', base64: pdfBase64 }] })
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || 'שגיאה בשליחה');
+          setWaDone(true);
+        } catch(e) { setWaError(e.message); }
+        finally { setSendingWA(false); }
+      };
+
+      const toggleClause = (id) => setClauses(prev => prev.map(c => c.id === id ? { ...c, enabled: !c.enabled } : c));
+      const addClause = () => {
+        if (!newClause.trim()) return;
+        setClauses(prev => [...prev, { id: 'c' + Date.now(), text: newClause.trim(), enabled: true }]);
+        setNewClause('');
+      };
+      const removeClause = (id) => setClauses(prev => prev.filter(c => c.id !== id));
 
       return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4"
              onClick={onClose}>
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl"
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl"
                onClick={e => e.stopPropagation()}>
-            {/* Header */}
+
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h2 className="font-bold text-lg text-gray-800">📄 מחירון PDF</h2>
               <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
 
-            {/* Product list with price inputs */}
-            <div className="overflow-y-auto flex-1 px-5 py-3 space-y-2">
-              <p className="text-xs text-gray-400 mb-3">הזן מחיר לכל מוצר שיופיע במחירון (אפשר להשאיר ריק)</p>
-              {products.map(p => (
-                <div key={p.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
-                  {p.image
-                    ? <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
-                    : <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-lg flex-shrink-0">🎈</div>
-                  }
-                  <span className="flex-1 text-sm font-medium text-gray-700 truncate">{p.name}</span>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <span className="text-gray-400 text-sm">₪</span>
-                    <input
-                      type="number"
-                      placeholder="מחיר"
-                      value={prices[p.id] || ''}
-                      onChange={e => setPrices(prev => ({ ...prev, [p.id]: e.target.value }))}
-                      className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-left
-                                 focus:outline-none focus:ring-2 focus:ring-red-300"
-                      dir="ltr"
-                    />
-                  </div>
+            <div className="overflow-y-auto flex-1 px-5 py-3 space-y-4">
+
+              {/* מע"מ */}
+              <div className="flex items-center justify-between bg-amber-50 rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">הוסף מע"מ 18%</p>
+                  <p className="text-xs text-amber-600">המחירים שהזנת הם ללא מע"מ</p>
                 </div>
-              ))}
+                <button onClick={() => setVatEnabled(v => !v)}
+                  className={"relative inline-flex h-6 w-11 items-center rounded-full transition-colors " + (vatEnabled ? 'bg-amber-500' : 'bg-gray-200')}>
+                  <span className={"inline-block h-4 w-4 rounded-full bg-white shadow transition-transform " + (vatEnabled ? 'translate-x-6' : 'translate-x-1')} />
+                </button>
+              </div>
+
+              {/* מחירים */}
+              <div>
+                <p className="text-xs text-gray-400 mb-2">הזן מחיר לכל מוצר שיופיע במחירון</p>
+                <div className="space-y-2">
+                  {products.map(p => {
+                    const raw = prices[p.id] || '';
+                    const shown = raw !== '' ? calcPrice(raw) : '';
+                    return (
+                      <div key={p.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+                        {p.image
+                          ? <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                          : <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-lg flex-shrink-0">🎈</div>}
+                        <span className="flex-1 text-sm font-medium text-gray-700 truncate">{p.name}</span>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <span className="text-gray-400 text-sm">₪</span>
+                          <input type="number" placeholder="מחיר" value={raw}
+                            onChange={e => setPrices(prev => ({ ...prev, [p.id]: e.target.value }))}
+                            className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-red-300"
+                            dir="ltr" />
+                          {shown !== '' && vatEnabled && (
+                            <span className="text-xs text-amber-600 font-bold w-14 text-left">={shown}₪</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* משפטים שמורים */}
+              <div className="border border-gray-100 rounded-xl p-3">
+                <p className="text-xs font-semibold text-gray-500 mb-2">📝 משפטים שמורים</p>
+                <div className="space-y-1.5">
+                  {clauses.map(c => (
+                    <div key={c.id} className="flex items-center gap-2">
+                      <input type="checkbox" checked={c.enabled} onChange={() => toggleClause(c.id)}
+                        className="accent-red-600 w-4 h-4 flex-shrink-0" />
+                      <span className="flex-1 text-xs text-gray-700">{c.text}</span>
+                      <button onClick={() => removeClause(c.id)}
+                        className="text-gray-300 hover:text-red-400 text-lg leading-none flex-shrink-0">×</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-2.5">
+                  <input type="text" placeholder="הוסף משפט חדש..." value={newClause}
+                    onChange={e => setNewClause(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addClause()}
+                    className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-red-300" />
+                  <button onClick={addClause}
+                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-600">הוסף</button>
+                </div>
+              </div>
+
+              {/* שליחה לוואטסאפ */}
+              {showWaSend && !waDone && (
+                <div className="border border-green-200 bg-green-50 rounded-xl p-3 space-y-2">
+                  <p className="text-xs font-semibold text-green-700">📱 שלח PDF לוואטסאפ</p>
+                  <input type="tel" placeholder="מספר טלפון (0501234567)" value={waPhone}
+                    onChange={e => setWaPhone(e.target.value)}
+                    className="w-full border border-green-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                    dir="ltr" />
+                  {waError && <p className="text-xs text-red-500">{waError}</p>}
+                  <button onClick={sendToWA} disabled={sendingWA}
+                    className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2">
+                    {sendingWA ? '⏳ שולח...' : '📤 שלח עכשיו'}
+                  </button>
+                </div>
+              )}
+              {waDone && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+                  <p className="text-green-700 font-bold text-sm">✅ המחירון נשלח בוואטסאפ!</p>
+                </div>
+              )}
             </div>
 
-            {/* Footer buttons */}
-            <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+            <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
               <button onClick={onClose}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-500 text-sm
-                           font-medium hover:bg-gray-50 transition-colors">
+                className="px-4 py-3 rounded-xl border border-gray-200 text-gray-500 text-sm font-medium hover:bg-gray-50">
                 ביטול
               </button>
+              <button onClick={() => { setShowWaSend(v => !v); setWaDone(false); setWaError(''); }}
+                className="flex-1 py-3 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+                💬 שלח לוואטסאפ
+              </button>
               <button onClick={doPrint}
-                className="flex-1 py-3 rounded-xl bg-[#cc0000] hover:bg-[#aa0000] text-white text-sm
-                           font-bold transition-colors flex items-center justify-center gap-2 shadow-md">
-                🖨️ הדפס / שמור PDF
+                className="flex-1 py-3 rounded-xl bg-[#cc0000] hover:bg-[#aa0000] text-white text-sm font-bold flex items-center justify-center gap-2 shadow-md">
+                🖨️ הדפס
               </button>
             </div>
           </div>
         </div>
       );
     }
+
 
     // קומפוננטה: SettingsModal
     // ─────────────────────────────────────────

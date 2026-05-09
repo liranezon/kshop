@@ -146,7 +146,7 @@ app.post('/send', requireToken, async (req, res) => {
         if (img.base64) {
           const [header,data] = img.base64.split(',');
           const mime = header.match(/:(.*?);/)[1];
-          media = new MessageMedia(mime, data, (img.name||'product')+'.jpg');
+          media = new MessageMedia(mime, data, img.name || 'product.jpg');
         } else {
           media = await MessageMedia.fromUrl(img.url, { unsafeMime: true });
         }

@@ -26,37 +26,44 @@
     @media print {
       body > #root       { display: none !important; }
       body > #kshop-print-catalog { display: block !important; }
-      /* margin:0 removes browser default header/footer lines (date, URL, title) */
       @page { margin: 0; size: A4 portrait; }
     }
     #kshop-print-catalog { display: none; direction: rtl; }
     #kshop-print-catalog * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
 
-    /* ── inner wrapper (provides page margins) */
-    .pc-wrap { padding: 10mm 12mm 8mm; background: #fff; min-height: 100vh; }
+    /* ── wrapper */
+    .pc-wrap { padding: 8mm 10mm 10mm; background: #fff; min-height: 100vh; }
 
-    /* ── header bar */
+    /* ── header */
     .pc-header {
-      background: #1a1a1a;
-      color: #fff;
-      padding: 14px 20px;
       display: flex;
-      direction: ltr;          /* LTR so logo=left, title=right */
-      align-items: center;
+      direction: ltr;
+      align-items: stretch;
       justify-content: space-between;
-      border-radius: 8px 8px 0 0;
-      margin-bottom: 0;
+      border-bottom: 3px solid #cc0000;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
     }
-    /* logo on the LEFT (first child in LTR) */
-    .pc-logo-wrap { display: flex; align-items: center; gap: 10px; }
-    .pc-logo-img  { height: 44px; width: auto; }
-    /* fallback text logo */
-    .pc-logo-k    { font-size: 28px; font-weight: 900; color: #cc0000; line-height: 1; }
-    .pc-logo-s    { font-size: 20px; font-style: italic; font-weight: 700; color: #fff; line-height: 1; }
-    /* title on the RIGHT (second child in LTR = right side) */
-    .pc-header-title { text-align: right; direction: rtl; }
-    .pc-catalog-title { font-size: 14px; font-weight: 700; opacity: .92; }
-    .pc-catalog-date  { font-size: 10px; opacity: .5; margin-top: 3px; }
+    .pc-logo-wrap { display: flex; align-items: center; gap: 8px; }
+    .pc-logo-img  { height: 52px; width: auto; object-fit: contain; }
+    .pc-logo-k    { font-size: 32px; font-weight: 900; color: #cc0000; line-height: 1; }
+    .pc-logo-s    { font-size: 22px; font-style: italic; font-weight: 700; color: #1a1a1a; line-height: 1; }
+    .pc-header-title { text-align: right; direction: rtl; display: flex; flex-direction: column; justify-content: center; }
+    .pc-catalog-title { font-size: 17px; font-weight: 800; color: #1a1a1a; }
+    .pc-catalog-subtitle { font-size: 11px; color: #888; margin-top: 3px; }
+    .pc-catalog-date  { font-size: 10px; color: #aaa; margin-top: 2px; }
+
+    /* ── divider line */
+    .pc-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #cc0000;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      padding-right: 2px;
+      direction: rtl;
+    }
 
     /* ── table */
     .pc-table {
@@ -64,79 +71,96 @@
       border-collapse: collapse;
       direction: rtl;
       font-size: 12px;
-      margin-top: 0;
+      border: 1.5px solid #ddd;
+      border-radius: 4px;
+      overflow: hidden;
     }
-    /* column headers — RED background */
-    .pc-table thead tr {
-      background: #cc0000;
-      color: #fff;
-    }
+    .pc-table thead tr { background: #cc0000; color: #fff; }
     .pc-table thead th {
-      padding: 9px 12px;
-      font-size: 12px;
+      padding: 9px 10px;
+      font-size: 11px;
       font-weight: 700;
       text-align: right;
-      border: none;
+      border-left: 1px solid #e05555;
+      white-space: nowrap;
     }
-    .pc-table thead th.col-img   { text-align: center; width: 72px; }
-    .pc-table thead th.col-price { text-align: center; width: 88px; }
+    .pc-table thead th:last-child { border-left: none; }
+    .pc-table thead th.col-num   { text-align: center; width: 28px; }
+    .pc-table thead th.col-img   { text-align: center; width: 68px; }
+    .pc-table thead th.col-price { text-align: center; width: 82px; }
+
     /* category row */
     .pc-cat-row td {
-      background: #cc0000;
-      color: #fff;
+      background: #f5f5f5;
+      color: #cc0000;
       font-weight: 700;
-      font-size: 13px;
-      padding: 8px 14px;
+      font-size: 11px;
+      padding: 5px 10px;
       text-align: right;
+      border-top: 1.5px solid #ddd;
+      border-bottom: 1px solid #e0e0e0;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
     }
-    /* data rows — alternating white / light rose */
+
+    /* data rows */
     .pc-table tbody tr.pc-row { page-break-inside: avoid; }
-    .pc-table tbody tr.pc-row:nth-child(odd)  { background: #ffffff; }
-    .pc-table tbody tr.pc-row:nth-child(even) { background: #fce8e8; }
+    .pc-table tbody tr.pc-row:nth-child(odd)  { background: #fff; }
+    .pc-table tbody tr.pc-row:nth-child(even) { background: #fdf5f5; }
     .pc-table tbody tr.pc-row td {
-      padding: 8px 12px;
-      border-bottom: 1px solid #f5d0d0;
+      padding: 7px 10px;
+      border-bottom: 1px solid #ebebeb;
+      border-left: 1px solid #f0f0f0;
       vertical-align: middle;
       text-align: right;
     }
+    .pc-table tbody tr.pc-row td:last-child { border-left: none; }
+    .pc-table tbody tr.pc-row:last-child td { border-bottom: none; }
+
+    /* row number cell */
+    .pc-row-num { text-align: center !important; color: #bbb; font-size: 10px; font-weight: 600; }
+
     /* image cell */
     .pc-row-img {
-      width: 64px;
-      height: 48px;
+      width: 58px; height: 44px;
       object-fit: cover;
-      border-radius: 6px;
-      display: block;
-      margin: 0 auto;
+      border-radius: 5px;
+      display: block; margin: 0 auto;
+      border: 1px solid #eee;
     }
     .pc-row-img-placeholder {
-      width: 64px;
-      height: 48px;
-      background: #f0ede8;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
+      width: 58px; height: 44px;
+      background: #f8f8f8;
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
       margin: 0 auto;
+      border: 1px solid #eee;
     }
     .pc-row-name  { font-weight: 700; color: #1a1a1a; font-size: 13px; }
-    .pc-row-dims  { font-size: 11px; color: #666; margin-top: 1px; }
-    /* price cell: ש"ח label + bold red number */
-    .pc-price-cell { text-align: center; }
-    .pc-price-label { font-size: 10px; color: #999; display: block; }
-    .pc-price-num   { font-size: 16px; font-weight: 900; color: #cc0000; display: block; line-height: 1.2; }
-    .pc-price-empty { color: #ccc; font-size: 11px; }
+    .pc-row-dims  { font-size: 10px; color: #999; margin-top: 2px; }
+
+    /* price cell */
+    .pc-price-cell { text-align: center !important; }
+    .pc-price-num   { font-size: 15px; font-weight: 900; color: #cc0000; display: block; line-height: 1.2; }
+    .pc-price-unit  { font-size: 9px; color: #bbb; display: block; margin-top: 1px; }
+    .pc-price-empty { color: #ddd; font-size: 11px; }
 
     /* ── footer */
     .pc-footer {
-      background: #1a1a1a;
-      color: #fff;
-      text-align: center;
-      padding: 9px;
-      font-size: 12px;
-      border-radius: 0 0 8px 8px;
+      border-top: 2px solid #cc0000;
+      margin-top: 12px;
+      padding-top: 8px;
+      display: flex;
+      direction: ltr;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: #999;
     }
-    .pc-footer strong { color: #cc0000; }
+    .pc-footer-contact { direction: rtl; text-align: right; }
+    .pc-footer-contact strong { color: #cc0000; font-size: 12px; }
+    .pc-footer-brand { font-size: 9px; color: #ccc; }
   </style>
 </head>
 <body>
@@ -1434,24 +1458,47 @@
         categories.forEach(c => { catLabel[c.key] = c.label; });
 
         let rowsHtml = '';
+        let rowNum = 0;
         Object.entries(catMap).forEach(([catKey, prods]) => {
           const label = catLabel[catKey] || (catKey === '__none__' ? '' : catKey);
-          if (label) rowsHtml += '<tr class="pc-cat-row"><td colspan="4">' + escHtml(label) + '</td></tr>';
+          if (label) rowsHtml += '<tr class="pc-cat-row"><td colspan="5">' + escHtml(label) + '</td></tr>';
           prods.forEach(p => {
+            rowNum++;
             const price    = calcPrice(prices[p.id]);
             const safeName = escHtml(p.name);
-            const safeDims = escHtml(p.dimensions || '—');
+            const safeDims = escHtml(p.dimensions || '');
             const safePrice = escHtml(price !== '' ? String(price) : '');
             const safeImg  = escHtml(p.image || '');
             const imgTag   = safeImg
               ? '<img src="' + safeImg + '" class="pc-row-img" alt="' + safeName + '" />'
               : '<div class="pc-row-img-placeholder">&#x1F388;</div>';
             const priceCell = safePrice
-              ? '<td class="pc-price-cell"><span class="pc-price-label">&#x05E9;"&#x05D7;</span><span class="pc-price-num">' + safePrice + '</span></td>'
+              ? '<td class="pc-price-cell"><span class="pc-price-num">' + safePrice + '</span><span class="pc-price-unit">&#x05E9;"&#x05D7;</span></td>'
               : '<td class="pc-price-cell"><span class="pc-price-empty">—</span></td>';
-            rowsHtml += '<tr class="pc-row"><td style="text-align:center">' + imgTag + '</td><td><div class="pc-row-name">' + safeName + '</div></td><td class="pc-row-dims">' + safeDims + '</td>' + priceCell + '</tr>';
+            const dimsCell = safeDims
+              ? '<div class="pc-row-dims">' + safeDims + '</div>'
+              : '';
+            rowsHtml += '<tr class="pc-row">'
+              + '<td class="pc-row-num">' + rowNum + '</td>'
+              + '<td style="text-align:center;padding:6px 8px">' + imgTag + '</td>'
+              + '<td><div class="pc-row-name">' + safeName + '</div>' + dimsCell + '</td>'
+              + priceCell
+              + '</tr>';
           });
         });
+
+        // ── סיכום מע"מ ──────────────────────────────────────────
+        const pricedItems = products.filter(p => prices[p.id] !== '' && !isNaN(parseFloat(prices[p.id])));
+        const subtotal = pricedItems.reduce((sum, p) => sum + parseFloat(prices[p.id]), 0);
+        const vatSummaryHtml = (vatEnabled && pricedItems.length > 0)
+          ? '<div style="margin-top:14px;padding:10px 14px;background:#fffbea;border:1px solid #f5e199;border-radius:8px;direction:rtl;font-size:12px;">' +
+              '<table style="width:100%;border-collapse:collapse;">' +
+                '<tr><td style="padding:3px 0;color:#555;">סכום לפני מע"מ</td><td style="text-align:left;font-weight:600;color:#333;">₪' + Math.round(subtotal).toLocaleString('he-IL') + '</td></tr>' +
+                '<tr><td style="padding:3px 0;color:#555;">מע"מ 18%</td><td style="text-align:left;font-weight:600;color:#b45309;">₪' + Math.round(subtotal * 0.18).toLocaleString('he-IL') + '</td></tr>' +
+                '<tr style="border-top:2px solid #f5e199;"><td style="padding:6px 0 3px;font-weight:700;color:#1a1a1a;font-size:13px;">סך הכל כולל מע"מ</td><td style="text-align:left;font-weight:800;color:#1a1a1a;font-size:14px;">₪' + Math.round(subtotal * 1.18).toLocaleString('he-IL') + '</td></tr>' +
+              '</table>' +
+            '</div>'
+          : '';
 
         const enabledClauses = clauses.filter(c => c.enabled);
         const clausesHtml = enabledClauses.length
@@ -1460,30 +1507,33 @@
             '</div>'
           : '';
 
-        const logoHtml = logoUrl
-          ? '<img src="' + logoUrl + '" class="pc-logo-img" alt="logo" />'
-          : '<div class="pc-logo-wrap" style="display:flex;align-items:center;gap:4px"><span class="pc-logo-k">K</span><span class="pc-logo-s">shop</span></div>';
+        const KSHOP_LOGO = 'data:image/jpeg;base64,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';
+        const logoHtml = '<img src="' + (logoUrl || KSHOP_LOGO) + '" class="pc-logo-img" alt="K-Shop" />';
 
         document.getElementById('kshop-print-catalog').innerHTML =
           '<div class="pc-wrap">' +
             '<div class="pc-header">' +
               '<div class="pc-logo-wrap">' + logoHtml + '</div>' +
               '<div class="pc-header-title">' +
-                '<div class="pc-catalog-title">&#x05E7;&#x05D9;&#x05D9; &#x05E9;&#x05D5;&#x05E4; &#x05D0;&#x05D5;&#x05DF; &#x05DC;&#x05D9;&#x05D9;&#x05DF; &#x05D1;&#x05E2;&#x05DE; — &#x05DE;&#x05D7;&#x05D9;&#x05E8;&#x05D5;&#x05DF; &#x05DE;&#x05D9;&#x05D5;&#x05D7;&#x05D3;</div>' +
-                '<div class="pc-catalog-date">' + today + '</div>' +
+                '<div class="pc-catalog-title">&#x05D4;&#x05E6;&#x05E2;&#x05EA; &#x05DE;&#x05D7;&#x05D9;&#x05E8; &#x2014; &#x05E7;&#x05D9;&#x05D9; &#x05E9;&#x05D5;&#x05E4; &#x05D0;&#x05D5;&#x05DF; &#x05DC;&#x05D9;&#x05D9;&#x05DF; &#x05D1;&#x05E2;&#x05F4;&#x05DE;</div>' +
+                '<div class="pc-catalog-date">&#x05EA;&#x05D0;&#x05E8;&#x05D9;&#x05DA;: ' + today + '</div>' +
               '</div>' +
             '</div>' +
             '<table class="pc-table">' +
               '<thead><tr>' +
+                '<th class="col-num">#</th>' +
                 '<th class="col-img">&#x05EA;&#x05DE;&#x05D5;&#x05E0;&#x05D4;</th>' +
-                '<th>&#x05E9;&#x05DD; &#x05DE;&#x05D5;&#x05E6;&#x05E8;</th>' +
-                '<th>&#x05DE;&#x05D9;&#x05D3;&#x05D5;&#x05EA;</th>' +
+                '<th>&#x05E9;&#x05DD; &#x05DE;&#x05D5;&#x05E6;&#x05E8; / &#x05DE;&#x05D9;&#x05D3;&#x05D5;&#x05EA;</th>' +
                 '<th class="col-price">&#x05DE;&#x05D7;&#x05D9;&#x05E8; (&#x05E9;"&#x05D7;)</th>' +
               '</tr></thead>' +
               '<tbody>' + rowsHtml + '</tbody>' +
             '</table>' +
+            vatSummaryHtml +
             clausesHtml +
-            '<div class="pc-footer">&#x05DC;&#x05E4;&#x05E8;&#x05D8;&#x05D9;&#x05DD; &#x05D5;&#x05D4;&#x05D6;&#x05DE;&#x05E0;&#x05D5;&#x05EA;: <strong>' + displayPhone + '</strong></div>' +
+            '<div class="pc-footer">' +
+              '<div class="pc-footer-brand">K-Shop</div>' +
+              '<div class="pc-footer-contact">&#x05DC;&#x05E4;&#x05E8;&#x05D8;&#x05D9;&#x05DD; &#x05D5;&#x05D4;&#x05D6;&#x05DE;&#x05E0;&#x05D5;&#x05EA;: <strong>' + displayPhone + '</strong></div>' +
+            '</div>' +
           '</div>';
       };
 

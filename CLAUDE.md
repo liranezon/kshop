@@ -21,20 +21,32 @@
 
 ## קבצים חשובים
 
-### Mac (workspace)
-- `/Users/liran/claude /K-Shop/deploy/index.html` — קובץ ה-frontend לפריסה
-- `/Users/liran/claude /K-Shop/kshop-wa-server/server.js` — גרסת השרת (לעדכונים)
-- `/Users/liran/claude /K-Shop/deploy-to-cloudflare.command` — סקריפט פריסה ל-Cloudflare Pages
-- `/Users/liran/claude /K-Shop/deploy-worker.command` — סקריפט פריסה ל-Worker
+### סביבת העבודה הנוכחית (Windows — kshop-project)
+- `index.html` — האפליקציה הראשית (single-file, React 18 + Tailwind CDN)
+- `server.js` — שרת WhatsApp (Node.js + whatsapp-web.js)
+- `current.md` — תיעוד מפורט של המצב הנוכחי: פיצ'רים, localStorage keys, ארכיטקטורה
 
-### Windows (במשרד)
+### Windows (שרת פעיל במשרד)
 - `C:\Users\liran\Desktop\kshop-final\kshop-server\server.js` — השרת הפעיל
 - `C:\Users\liran\Desktop\kshop-final\kshop-server\api-token.txt` — ה-API Token
 - `C:\Users\liran\Desktop\kshop-final\kshop-server\ww-session\` — סשן הוואטסאפ
 
+### סקריפטי פריסה (Mac)
+- `/Users/liran/claude /K-Shop/deploy-to-cloudflare.command` — פריסה ל-Cloudflare Pages
+- `/Users/liran/claude /K-Shop/deploy-worker.command` — פריסה ל-Worker
+
+## טכנולוגיות Frontend
+
+- **React 18** — CDN + Babel Standalone (ללא build)
+- **Tailwind CSS** — CDN
+- **html2canvas 1.4.1** — לצילום DOM לשליחת PDF
+- **jsPDF 2.5.1** — יצירת PDF מה-canvas
+- **Supabase JS v2** — auth + database
+- **Single-file HTML** — הכל בקובץ index.html אחד
+
 ## אבטחה
 
-- server.js כבר מאובטח עם requireToken middleware — token נשמר ב-api-token.txt
+- server.js מאובטח עם requireToken middleware — token נשמר ב-api-token.txt
 - Supabase RLS מופעל על כל הטבלאות (products, contacts, app_settings) ✅
 - API Token של K-Shop (localStorage): 43c1745030c25ec9ba6ba2099acdd600a188bb7eae8facea
 
@@ -53,3 +65,9 @@
 - ✅ תיקון CORS עם ngrok-skip-browser-warning header
 - ✅ תיקון כתובת שרת: ngrok-free.dev (לא .app ולא Railway)
 - ✅ server.js מאובטח עם token validation
+- ✅ PricingModal — מחירון PDF מלא:
+  - Toggle מע"מ 18% עם חישוב אוטומטי
+  - משפטים שמורים (localStorage: `kshop_pdf_clauses`) עם הוספה/מחיקה
+  - הדפסה / שמירת PDF דרך `window.print()`
+  - שליחת PDF לוואטסאפ: html2canvas → jsPDF → base64 → שרת `/send`
+- ✅ תיקון באג: filename לא מקבל סיומת שגויה — משתמש ב-`img.name` ישירות

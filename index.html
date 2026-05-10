@@ -34,6 +34,23 @@
     .toast-enter { animation: toast-in  0.28s cubic-bezier(.21,1.02,.73,1) forwards; }
     .toast-exit  { animation: toast-out 0.22s ease-in forwards; }
 
+    /* ── Modal animations ──────────────────────── */
+    @keyframes modal-backdrop-in {
+      from { background-color: rgba(0,0,0,0); }
+      to   { background-color: rgba(0,0,0,0.5); }
+    }
+    @keyframes modal-backdrop-in-60 {
+      from { background-color: rgba(0,0,0,0); }
+      to   { background-color: rgba(0,0,0,0.6); }
+    }
+    @keyframes modal-panel-in {
+      from { opacity: 0; transform: translateY(20px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0)    scale(1); }
+    }
+    .modal-backdrop   { animation: modal-backdrop-in    0.2s ease forwards; }
+    .modal-backdrop-60{ animation: modal-backdrop-in-60 0.2s ease forwards; }
+    .modal-panel      { animation: modal-panel-in 0.25s cubic-bezier(.21,1.02,.73,1) forwards; }
+
     /* ── Print / PDF styles ────────────────────── */
     @media print {
       body > #root       { display: none !important; }
@@ -998,9 +1015,9 @@
 
       // ── Render ──────────────────────────────────────────
       return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6"
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6 modal-backdrop"
              onClick={onClose}>
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto"
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto modal-panel"
                onClick={e => e.stopPropagation()}>
 
             {/* Header */}
@@ -1214,8 +1231,8 @@
       const labelCls = "block text-sm font-medium text-gray-700 mb-1";
 
       return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6 modal-backdrop">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto modal-panel">
 
             {/* Header */}
             <div className="sticky top-0 bg-white flex items-center justify-between px-5 py-4 border-b z-10">
@@ -1372,9 +1389,9 @@
       };
 
       return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 modal-backdrop"
              onClick={onClose}>
-          <div className="bg-white rounded-2xl w-full max-w-xs p-6"
+          <div className="bg-white rounded-2xl w-full max-w-xs p-6 modal-panel"
                onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg">➕ קטגוריה חדשה</h2>
@@ -1589,9 +1606,9 @@
       const removeClause = (id) => setClauses(prev => prev.filter(c => c.id !== id));
 
       return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4 modal-backdrop-60"
              onClick={onClose}>
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl"
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl modal-panel"
                onClick={e => e.stopPropagation()}>
 
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -1765,9 +1782,9 @@
       };
 
       return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 modal-backdrop"
              onClick={onClose}>
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto"
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto modal-panel"
                onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-bold text-lg">⚙️ הגדרות</h2>
@@ -2707,4 +2724,3 @@
   </script>
 </body>
 </html>
-            

@@ -17,10 +17,22 @@
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     input[type="file"]::file-selector-button {
-      background: #6366f1; color: white; border: none;
+      background: #111827; color: white; border: none;
       padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px;
     }
-    input[type="file"]::file-selector-button:hover { background: #4f46e5; }
+    input[type="file"]::file-selector-button:hover { background: #374151; }
+
+    /* ── Toast notifications ──────────────────────── */
+    @keyframes toast-in {
+      from { transform: translateY(-110%); opacity: 0; }
+      to   { transform: translateY(0);      opacity: 1; }
+    }
+    @keyframes toast-out {
+      from { transform: translateY(0);      opacity: 1; }
+      to   { transform: translateY(-110%); opacity: 0; }
+    }
+    .toast-enter { animation: toast-in  0.28s cubic-bezier(.21,1.02,.73,1) forwards; }
+    .toast-exit  { animation: toast-out 0.22s ease-in forwards; }
 
     /* ── Print / PDF styles ────────────────────── */
     @media print {
@@ -2082,7 +2094,32 @@
     // ─────────────────────────────────────────
     // קומפוננטה ראשית: App
     // ─────────────────────────────────────────
-    function App() {
+    // ─────────────────────────────────────────
+    // קומפוננטה: Toast
+    // ─────────────────────────────────────────
+    function Toast({ toasts }) {
+      return (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-2 pointer-events-none"
+             style={{ direction: 'rtl' }}>
+          {toasts.map(t => (
+            <div key={t.id}
+                 className={`${t.exiting ? 'toast-exit' : 'toast-enter'}
+                   flex items-center gap-2.5 px-4 py-2.5 rounded-xl shadow-lg text-sm font-semibold
+                   pointer-events-auto select-none min-w-[180px] max-w-[320px]
+                   ${t.type === 'error'   ? 'bg-red-600 text-white' :
+                     t.type === 'warning' ? 'bg-amber-500 text-white' :
+                                            'bg-gray-900 text-white'}`}>
+              <span className="flex-shrink-0 text-base">
+                {t.type === 'error' ? '⚠️' : t.type === 'warning' ? '⚡' : '✓'}
+              </span>
+              {t.msg}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+        function App() {
       const [loggedIn,    setLoggedIn]    = useState(false);
       const [products,    setProducts]    = useState([]);
       const [selectedIds, setSelectedIds] = useState(new Set());
@@ -2103,6 +2140,16 @@
       const [logoUrl,     setLogoUrl]     = useState('');
       const [showPricing, setShowPricing] = useState(false);
       const [initialLoading, setInitialLoading] = useState(true); // מחכה לטעינה ראשונית מהענן
+      const [toasts, setToasts] = useState([]);
+
+      const showToast = React.useCallback((msg, type = 'success') => {
+        const id = Date.now() + Math.random();
+        setToasts(prev => [...prev, { id, msg, type, exiting: false }]);
+        setTimeout(() => {
+          setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+          setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 250);
+        }, 2800);
+      }, []);
 
       // פונקציה לטעינת נתוני ענן ועדכון state
       const applyCloudData = (data) => {
@@ -2239,6 +2286,7 @@
         const exists = products.some(p => p.id === form.id);
         save(exists ? products.map(p => p.id === form.id ? form : p) : [...products, form]);
         setShowForm(false); setEditProduct(null);
+        showToast(exists ? 'מוצר עודכן' : 'מוצר נוסף');
       };
 
       const handleDelete = (id) => {
@@ -2246,6 +2294,7 @@
         save(products.filter(p => p.id !== id));
         setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
         setShowForm(false); setEditProduct(null);
+        showToast('מוצר נמחק', 'warning');
       };
 
       const handleQuantityChange = (id, delta, warehouseKey = null) => {
@@ -2371,9 +2420,10 @@
                           const cats     = savedCats.length > 0 ? savedCats : CATEGORIES;
                           await cloudSave({ products: prods, categories: cats, whatsappNumber: localStorage.getItem('kshop_whatsapp_number') || '972509933322' });
                           setSyncStatus('ok');
+                          showToast('נשמר לענן ✓');
                         } catch(e) {
                           setSyncStatus('error');
-                          alert('שגיאת שמירה: ' + e.message);
+                          showToast('שגיאת שמירה', 'error');
                         }
                       }}
                       title="שמור לענן"
@@ -2397,13 +2447,14 @@
                               localStorage.setItem('kshop_categories', JSON.stringify(data.categories));
                             }
                             setSyncStatus('ok');
+                            showToast('נטען מהענן ✓');
                           } else {
                             setSyncStatus('error');
-                            alert('הענן ריק – שמור קודם ממחשב אחר');
+                            showToast('הענן ריק', 'warning');
                           }
                         } catch(e) {
                           setSyncStatus('error');
-                          alert('שגיאת טעינה: ' + e.message);
+                          showToast('שגיאת טעינה', 'error');
                         }
                       }}
                       title="טען מהענן"
@@ -2600,6 +2651,9 @@
               </div>
             </div>
           )}
+
+          {/* ── Toast Notifications ── */}
+          <Toast toasts={toasts} />
 
           {/* ── Customer Mode Footer (הנחיה לבחור מוצרים) ── */}
           {!adminMode && selectedIds.size === 0 && (

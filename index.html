@@ -386,7 +386,7 @@
       };
 
       return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-xs text-center">
             <div className="text-5xl mb-3">🔐</div>
             <h1 className="text-2xl font-bold text-gray-800 mb-1">K-Shop</h1>
@@ -398,16 +398,16 @@
                 value={email} dir="ltr"
                 onChange={e => { setEmail(e.target.value); setErr(''); }}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-center text-sm
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                           focus:outline-none focus:ring-2 focus:ring-gray-400" />
               <input
                 type="password" placeholder="סיסמה"
                 value={pw}
                 onChange={e => { setPw(e.target.value); setErr(''); }}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-center text-base
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                           focus:outline-none focus:ring-2 focus:ring-gray-400" />
               {err && <p className="text-red-500 text-sm">{err}</p>}
               <button type="submit" disabled={loading}
-                className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white
+                className="w-full bg-gray-900 hover:bg-gray-700 disabled:opacity-50 text-white
                            font-semibold py-3 rounded-xl transition-colors">
                 {loading ? '⏳ ...' : 'כניסה'}
               </button>
@@ -427,15 +427,15 @@
             <button key={c.key} onClick={() => onChange(c.key)}
               className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
                 ${active === c.key
-                  ? 'bg-indigo-500 text-white shadow-sm'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:border-indigo-300'}`}>
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'}`}>
               {c.label}
             </button>
           ))}
           {adminMode && onAddCategory && (
             <button onClick={onAddCategory}
-              className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium bg-white text-indigo-500
-                         border border-indigo-300 hover:bg-indigo-50 transition-colors whitespace-nowrap">
+              className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium bg-white text-gray-700
+                         border border-gray-300 hover:bg-gray-50 transition-colors whitespace-nowrap">
               ➕ קטגוריה
             </button>
           )}
@@ -479,10 +479,10 @@
           onDrop={(e) => { if (onDrop) onDrop(e, product); }}
           onClick={() => onToggle(product.id)}
           className={`bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer
-            transition-all duration-150 select-none relative group
+            transition-all duration-200 select-none relative group
             ${selected
-              ? 'ring-2 ring-indigo-500 shadow-md shadow-indigo-100'
-              : 'hover:shadow-md hover:scale-[1.01]'}
+              ? 'ring-2 ring-gray-900 shadow-lg shadow-gray-200'
+              : 'hover:shadow-lg hover:shadow-gray-200/80 hover:scale-[1.015] hover:-translate-y-0.5'}
             ${adminMode ? 'cursor-grab active:cursor-grabbing' : ''}`}>
 
           {/* תמונה */}
@@ -508,8 +508,8 @@
 
             {/* V כשנבחר */}
             {selected && (
-              <div className="absolute inset-0 bg-indigo-500/10 flex items-end justify-end p-2">
-                <div className="bg-indigo-500 text-white rounded-full w-7 h-7 flex items-center
+              <div className="absolute inset-0 bg-gray-500/10 flex items-end justify-end p-2">
+                <div className="bg-gray-900 text-white rounded-full w-7 h-7 flex items-center
                                 justify-center text-base font-bold shadow-lg">✓</div>
               </div>
             )}
@@ -543,9 +543,9 @@
                       <div className="flex flex-wrap gap-1 mt-1">
                         {entries.map(w => (
                           <span key={w.key}
-                            className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                            className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-medium">
                             {w.label}
-                            <span className="bg-indigo-200 text-indigo-800 rounded-full px-1.5 font-bold">{w.qty}</span>
+                            <span className="bg-slate-300 text-slate-700 rounded-full px-1.5 font-bold">{w.qty}</span>
                           </span>
                         ))}
                       </div>
@@ -567,10 +567,10 @@
                           onClick={e => handleWhChoice(e, w.key, whPopup === 'minus' ? -1 : +1)}
                           disabled={whPopup === 'minus' && w.qty <= 0}
                           className="w-full flex justify-between items-center px-2 py-1.5 rounded-lg
-                                     hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed
+                                     hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed
                                      transition-colors mb-0.5">
                           <span className="text-gray-700 font-medium">{w.label}</span>
-                          <span className="text-indigo-600 font-bold">{w.qty} יח׳</span>
+                          <span className="text-gray-700 font-bold">{w.qty} יח׳</span>
                         </button>
                       ))}
                       <button onClick={e => { e.stopPropagation(); setWhPopup(null); }}
@@ -589,7 +589,7 @@
                                    text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed
                                    transition-colors text-base leading-none
                                    ${whPopup === 'minus'
-                                     ? 'bg-indigo-100 text-indigo-600'
+                                     ? 'bg-gray-100 text-gray-700'
                                      : 'bg-gray-100 hover:bg-red-100 hover:text-red-600'}`}>
                         −
                       </button>
@@ -601,7 +601,7 @@
                         className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold
                                    text-gray-500 transition-colors text-base leading-none
                                    ${whPopup === 'plus'
-                                     ? 'bg-indigo-100 text-indigo-600'
+                                     ? 'bg-gray-100 text-gray-700'
                                      : 'bg-gray-100 hover:bg-green-100 hover:text-green-600'}`}>
                         +
                       </button>
@@ -617,7 +617,7 @@
                 {product.costPrice > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-400">עלות</span>
-                    <span className="font-semibold text-indigo-600">₪{Number(product.costPrice).toLocaleString()}</span>
+                    <span className="font-semibold text-gray-700">₪{Number(product.costPrice).toLocaleString()}</span>
                   </div>
                 )}
                 {(product.futureQty || 0) > 0 && (
@@ -780,7 +780,7 @@
                         if (!q) return str;
                         const idx = str.toLowerCase().indexOf(q.toLowerCase());
                         if (idx === -1) return str;
-                        return [str.slice(0, idx), <strong key="h" className="text-indigo-600">{str.slice(idx, idx + q.length)}</strong>, str.slice(idx + q.length)];
+                        return [str.slice(0, idx), <strong key="h" className="text-gray-700">{str.slice(idx, idx + q.length)}</strong>, str.slice(idx + q.length)];
                       };
                       const phoneStr = c.phone;
                       const phoneHi  = digits.length > 0 ? hi(phoneStr, digits) : phoneStr;
@@ -789,8 +789,8 @@
                           className="w-full flex justify-between items-center px-4 py-3
                                      hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
                           <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center
-                                            justify-center text-indigo-700 font-bold text-xs flex-shrink-0">
+                            <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center
+                                            justify-center text-gray-700 font-bold text-xs flex-shrink-0">
                               {c.name.charAt(0)}
                             </div>
                             <span className="font-medium text-gray-800 text-sm">{hi(c.name, query)}</span>
@@ -805,7 +805,7 @@
                   }
                   {isPhoneQuery && !alreadySaved && !showSaveForm && (
                     <button onClick={() => { setShowSaveForm(true); setOpen(false); }}
-                      className="w-full py-3 px-4 text-sm text-indigo-600 hover:bg-indigo-50
+                      className="w-full py-3 px-4 text-sm text-gray-700 hover:bg-gray-50
                                  border-t border-gray-100 font-medium transition-colors flex items-center gap-2">
                       <span className="text-lg">+</span> שמור {query} כאיש קשר
                     </button>
@@ -821,15 +821,15 @@
               )}
 
               {showSaveForm && (
-                <div className="mt-2 bg-indigo-50 rounded-xl p-3 flex gap-2 items-center">
+                <div className="mt-2 bg-gray-50 rounded-xl p-3 flex gap-2 items-center">
                   <input autoFocus placeholder="שם איש הקשר" value={newName}
                     onChange={e => setNewName(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && saveNew()}
-                    className="flex-1 border border-indigo-200 rounded-lg px-3 py-2 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm
+                               focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white" />
                   <button onClick={saveNew} disabled={saving || !newName.trim()}
-                    className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium
-                               hover:bg-indigo-600 disabled:opacity-50 whitespace-nowrap">
+                    className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium
+                               hover:bg-gray-700 disabled:opacity-50 whitespace-nowrap">
                     {saving ? '...' : 'שמור'}
                   </button>
                   <button onClick={() => setShowSaveForm(false)}
@@ -873,27 +873,27 @@
               className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-medium
                          transition-colors ${showAdd
                            ? 'bg-gray-200 text-gray-600'
-                           : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}>
+                           : 'bg-gray-100 text-gray-700 hover:bg-gray-100'}`}>
               {showAdd ? '✕ ביטול' : '+ איש קשר חדש'}
             </button>
           </div>
 
           {showAdd ? (
-            <div className="bg-indigo-50 rounded-xl p-3 space-y-2">
+            <div className="bg-gray-50 rounded-xl p-3 space-y-2">
               <input autoFocus placeholder="שם" value={addName}
                 onChange={e => setAddName(e.target.value)}
-                className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white" />
               <input placeholder="מספר טלפון" value={addPhone}
                 onChange={e => setAddPhone(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && saveContact()}
                 dir="ltr"
-                className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white" />
               <button onClick={saveContact}
                 disabled={saving || !addName.trim() || !addPhone.trim()}
-                className="w-full py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium
-                           hover:bg-indigo-600 disabled:opacity-50 transition-colors">
+                className="w-full py-2 bg-gray-900 text-white rounded-lg text-sm font-medium
+                           hover:bg-gray-700 disabled:opacity-50 transition-colors">
                 {saving ? 'שומר...' : 'שמור ובחר'}
               </button>
             </div>
@@ -1073,7 +1073,7 @@
                   טקסט + {products.length} תמונות נשלחו לוואטסאפ
                 </p>
                 <button onClick={onClose}
-                  className="bg-indigo-500 text-white px-8 py-2.5 rounded-xl font-medium hover:bg-indigo-600">
+                  className="bg-gray-900 text-white px-8 py-2.5 rounded-xl font-medium hover:bg-gray-700">
                   סגור
                 </button>
               </div>
@@ -1198,7 +1198,7 @@
       };
 
       const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm " +
-                       "focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white";
+                       "focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white";
       const labelCls = "block text-sm font-medium text-gray-700 mb-1";
 
       return (
@@ -1285,13 +1285,13 @@
                           set('quantity', total);
                         }}
                         className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-center
-                                   focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+                                   focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white" />
                     </div>
                   );
                 })}
                 <div className="flex justify-between items-center pt-1 border-t border-gray-200">
                   <span className="text-xs text-gray-400">סה"כ</span>
-                  <span className="font-bold text-indigo-600 text-sm">
+                  <span className="font-bold text-gray-700 text-sm">
                     {Object.values(f.warehouse_qty || {}).reduce((a, b) => a + (Number(b) || 0), 0)} יחידות
                   </span>
                 </div>
@@ -1333,8 +1333,8 @@
                   ביטול
                 </button>
                 <button type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-500 text-white text-sm
-                             font-semibold hover:bg-indigo-600 transition-colors">
+                  className="flex-1 py-2.5 rounded-xl bg-gray-900 text-white text-sm
+                             font-semibold hover:bg-gray-700 transition-colors">
                   {isNew ? 'הוסף מוצר' : 'שמור שינויים'}
                 </button>
               </div>
@@ -1377,11 +1377,11 @@
                 value={label}
                 onChange={e => setLabel(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                           focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
               {err && <p className="text-red-500 text-sm">{err}</p>}
               <button type="submit"
-                className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-xl
+                className="w-full bg-gray-900 hover:bg-gray-700 text-white py-2 rounded-xl
                            font-semibold text-sm transition-colors">
                 הוסף קטגוריה
               </button>
@@ -1791,9 +1791,9 @@
             </div>
 
             {/* כתובת שרת וואטסאפ */}
-            <div className="bg-indigo-50 rounded-xl p-4 mb-4 space-y-2">
-              <p className="text-sm font-semibold text-indigo-700">🌐 כתובת שרת וואטסאפ</p>
-              <p className="text-xs text-indigo-500">הכתובת של ngrok (לדוגמה: https://landmine-thumb-stegosaur.ngrok-free.app)</p>
+            <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-2">
+              <p className="text-sm font-semibold text-gray-700">🌐 כתובת שרת וואטסאפ</p>
+              <p className="text-xs text-gray-700">הכתובת של ngrok (לדוגמה: https://landmine-thumb-stegosaur.ngrok-free.app)</p>
               <input
                 type="url"
                 placeholder="https://xxxx.ngrok-free.app"
@@ -1801,7 +1801,7 @@
                 onChange={e => setServerUrl(e.target.value)}
                 dir="ltr"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                           focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
               <button onClick={async () => {
                 const url = serverUrl.replace(/\/$/, '');
@@ -1815,8 +1815,8 @@
                 }
                 setTimeout(() => setMsg(''), 3000);
               }}
-                className="w-full py-2 rounded-xl bg-indigo-500 text-white text-sm
-                           font-medium hover:bg-indigo-600 transition-colors">
+                className="w-full py-2 rounded-xl bg-gray-900 text-white text-sm
+                           font-medium hover:bg-gray-700 transition-colors">
                 💾 שמור כתובת
               </button>
             </div>
@@ -1935,8 +1935,8 @@
                   )}
                   {contacts.map(c => (
                     <div key={c.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
-                      <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center
-                                      text-indigo-700 font-bold text-xs flex-shrink-0">
+                      <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center
+                                      text-gray-700 font-bold text-xs flex-shrink-0">
                         {c.name.charAt(0)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1953,15 +1953,15 @@
                   ))}
 
                   {/* הוספה */}
-                  <div className="bg-indigo-50 rounded-xl p-3 space-y-2">
-                    <p className="text-xs font-medium text-indigo-700">+ הוסף איש קשר</p>
+                  <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                    <p className="text-xs font-medium text-gray-700">+ הוסף איש קשר</p>
                     <input placeholder="שם" value={newCName} onChange={e => setNewCName(e.target.value)}
-                      className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm
-                                 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white" />
                     <input placeholder="מספר טלפון" value={newCPhone} onChange={e => setNewCPhone(e.target.value)}
                       dir="ltr"
-                      className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm
-                                 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white" />
                     <button disabled={addingC || !newCName.trim() || !newCPhone.trim()}
                       onClick={async () => {
                         setAddingC(true);
@@ -1971,8 +1971,8 @@
                         setContacts(prev => [...prev, c].sort((a,b) => a.name.localeCompare(b.name, 'he')));
                         setNewCName(''); setNewCPhone(''); setAddingC(false);
                       }}
-                      className="w-full py-2 bg-indigo-500 text-white rounded-lg text-sm
-                                 font-medium hover:bg-indigo-600 disabled:opacity-50 transition-colors">
+                      className="w-full py-2 bg-gray-900 text-white rounded-lg text-sm
+                                 font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors">
                       {addingC ? 'שומר...' : 'הוסף'}
                     </button>
                   </div>
@@ -2028,7 +2028,7 @@
                         }
                       }}
                       className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm
-                                 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                 focus:outline-none focus:ring-2 focus:ring-gray-400"
                     />
                     <button
                       onClick={() => {
@@ -2039,8 +2039,8 @@
                         setMsg('✅ מחסן נוסף!');
                         setTimeout(() => setMsg(''), 2000);
                       }}
-                      className="px-3 py-2 bg-indigo-500 text-white rounded-xl text-sm
-                                 font-medium hover:bg-indigo-600 transition-colors">
+                      className="px-3 py-2 bg-gray-900 text-white rounded-xl text-sm
+                                 font-medium hover:bg-gray-700 transition-colors">
                       ➕
                     </button>
                   </div>
@@ -2054,15 +2054,15 @@
               <input type="password" placeholder="סיסמה חדשה" value={newPw}
                 onChange={e => setNewPw(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                           focus:outline-none focus:ring-2 focus:ring-gray-400" />
               <input type="password" placeholder="אשר סיסמה" value={conf}
                 onChange={e => setConf(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                           focus:outline-none focus:ring-2 focus:ring-gray-400" />
               {msg && <p className="text-sm">{msg}</p>}
               <button type="submit"
-                className="w-full py-2.5 rounded-xl bg-indigo-500 text-white text-sm
-                           font-semibold hover:bg-indigo-600 transition-colors">
+                className="w-full py-2.5 rounded-xl bg-gray-900 text-white text-sm
+                           font-semibold hover:bg-gray-700 transition-colors">
                 עדכן סיסמה
               </button>
             </form>
@@ -2274,14 +2274,14 @@
 
       // מסך טעינה ראשונית — מחכה שהענן יחזיר נתונים לפני כל הצגה
       if (initialLoading) return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center">
           <div className="text-center">
             <div className="text-5xl mb-4">🛒</div>
             <div className="text-gray-500 text-lg font-medium">K-Shop</div>
             <div className="text-gray-400 text-sm mt-2">טוען נתונים...</div>
             <div className="mt-4 flex justify-center gap-1">
               {[0,1,2].map(i => (
-                <div key={i} className="w-2 h-2 rounded-full bg-indigo-300 animate-bounce"
+                <div key={i} className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
                      style={{animationDelay: `${i*0.15}s`}} />
               ))}
             </div>
@@ -2343,10 +2343,17 @@
           <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
             <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
 
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🎪</span>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-gray-900 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="white" strokeWidth="1.5">
+                    <path d="M2 4h14l-1.5 7H3.5L2 4z"/>
+                    <circle cx="6.5" cy="15" r="1"/>
+                    <circle cx="12.5" cy="15" r="1"/>
+                    <path d="M2 4L1 1H0"/>
+                  </svg>
+                </div>
                 <div className="leading-tight">
-                  <span className="font-bold text-gray-800 text-lg block">K-Shop</span>
+                  <span className="font-bold text-gray-800 text-base block">K-Shop</span>
                   <span className="text-xs text-gray-400">{adminMode ? 'מצב ניהול' : 'תצוגת לקוח'}</span>
                 </div>
               </div>
@@ -2400,7 +2407,7 @@
                         }
                       }}
                       title="טען מהענן"
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors">
                       🔄 טען
                     </button>
                   </>
@@ -2408,7 +2415,7 @@
                 {/* כפתור מוצר חדש – ניהול */}
                 {adminMode && (
                   <button onClick={openNew}
-                    className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold
+                    className="bg-gray-900 hover:bg-gray-700 text-white text-sm font-semibold
                                px-3 py-1.5 rounded-xl transition-colors">
                     + מוצר
                   </button>
@@ -2417,7 +2424,7 @@
                 {/* תפריט הגדרות / ניהול */}
                 {!adminMode ? (
                   <button onClick={openAdminMode}
-                    className="text-sm text-gray-500 hover:text-indigo-600 transition-colors px-2 py-1">
+                    className="text-sm text-gray-500 hover:text-gray-700 transition-colors px-2 py-1">
                     ניהול 🔑
                   </button>
                 ) : (
@@ -2463,7 +2470,7 @@
                 <input type="text" placeholder="🔍 חיפוש מוצר..."
                   value={query} onChange={e => setQuery(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+                             focus:outline-none focus:ring-2 focus:ring-gray-300" />
                 {query && (
                   <button onClick={() => setQuery('')}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -2510,16 +2517,25 @@
           {/* ── Product Grid ── */}
           <main className="max-w-4xl mx-auto p-4 pb-32">
             {filtered.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="text-7xl mb-4">🎈</div>
-                <p className="text-gray-400 font-medium text-lg">
-                  {products.length === 0 ? 'אין מוצרים עדיין' : 'לא נמצאו מוצרים'}
+              <div className="text-center py-24 px-6">
+                <div className="mx-auto w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center mb-5">
+                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                    <rect x="6" y="10" width="28" height="22" rx="3"/>
+                    <path d="M14 10V8a6 6 0 0 1 12 0v2"/>
+                    <circle cx="20" cy="21" r="3"/>
+                  </svg>
+                </div>
+                <p className="text-gray-700 font-semibold text-base mb-1">
+                  {products.length === 0 ? 'עדיין אין מוצרים' : 'לא נמצאו תוצאות'}
+                </p>
+                <p className="text-gray-400 text-sm mb-6">
+                  {products.length === 0 ? 'הוסף את המוצר הראשון שלך כדי להתחיל' : 'נסה מילת חיפוש אחרת'}
                 </p>
                 {products.length === 0 && adminMode && (
                   <button onClick={openNew}
-                    className="mt-5 bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3
-                               rounded-xl font-semibold transition-colors">
-                    ➕ הוסף מוצר ראשון
+                    className="bg-gray-900 hover:bg-gray-700 text-white px-6 py-2.5
+                               rounded-xl font-semibold text-sm transition-colors">
+                    + הוסף מוצר ראשון
                   </button>
                 )}
               </div>
@@ -2568,7 +2584,7 @@
                 {adminMode && (
                   <button
                     onClick={() => setShowPricing(true)}
-                    className="flex-shrink-0 bg-[#cc0000] hover:bg-[#aa0000] text-white px-4 py-3
+                    className="flex-shrink-0 bg-gray-900 hover:bg-gray-700 text-white px-4 py-3
                                rounded-xl font-bold text-sm flex items-center gap-2 shadow-md
                                transition-colors">
                     📄 מחירון
@@ -2637,3 +2653,4 @@
   </script>
 </body>
 </html>
+            

@@ -518,7 +518,13 @@
           <div className="relative aspect-square bg-gray-100">
             {product.image
               ? <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-              : <div className="w-full h-full flex items-center justify-center text-5xl text-gray-200">🎈</div>
+              : <div className="w-full h-full flex items-center justify-center">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#d1d5db" strokeWidth="1.5">
+                  <rect x="6" y="10" width="36" height="28" rx="4"/>
+                  <circle cx="18" cy="22" r="4"/>
+                  <path d="M6 32l10-8 8 8 6-5 12 9"/>
+                </svg>
+              </div>
             }
 
             {/* Handle - ניידות במצב ניהול */}
@@ -1023,7 +1029,12 @@
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <div>
-                <h2 className="font-bold text-lg">שליחה בוואטסאפ</h2>
+                <h2 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#25D366">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/>
+                </svg>
+                שליחה בוואטסאפ
+              </h2>
                 <p className="text-xs mt-0.5">
                   {serverStatus === 'checking'     && <span className="text-gray-400">⏳ בודק חיבור לשרת...</span>}
                   {serverStatus === 'ready'        && <span className="text-green-600 font-medium">✅ מחובר – שליחה אוטומטית</span>}
@@ -1032,7 +1043,9 @@
                   {serverStatus === 'no_server'    && <span className="text-gray-400">לא הוגדר שרת – הגדר בהגדרות</span>}
                 </p>
               </div>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+              </button>
             </div>
 
             {/* ══ QR – צריך לחבר וואטסאפ ══ */}
@@ -1236,8 +1249,10 @@
 
             {/* Header */}
             <div className="sticky top-0 bg-white flex items-center justify-between px-5 py-4 border-b z-10">
-              <h2 className="font-bold text-lg">{isNew ? '➕ מוצר חדש' : '✏️ עריכת מוצר'}</h2>
-              <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+              <h2 className="font-bold text-lg text-gray-800">{isNew ? '+ מוצר חדש' : 'עריכת מוצר'}</h2>
+              <button onClick={onCancel} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+              </button>
             </div>
 
             <form onSubmit={submit} className="px-5 py-4 space-y-4">
@@ -1394,8 +1409,10 @@
           <div className="bg-white rounded-2xl w-full max-w-xs p-6 modal-panel"
                onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-lg">➕ קטגוריה חדשה</h2>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+              <h2 className="font-bold text-lg text-gray-800">קטגוריה חדשה</h2>
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+              </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -1612,8 +1629,18 @@
                onClick={e => e.stopPropagation()}>
 
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h2 className="font-bold text-lg text-gray-800">📄 מחירון PDF</h2>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+              <h2 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+                מחירון PDF
+              </h2>
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+              </button>
             </div>
 
             <div className="overflow-y-auto flex-1 px-5 py-3 space-y-4">
@@ -1787,8 +1814,16 @@
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto modal-panel"
                onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold text-lg">⚙️ הגדרות</h2>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+              <h2 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+              </svg>
+              הגדרות
+            </h2>
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+              </button>
             </div>
 
             {/* לוגו העסק */}
@@ -2101,7 +2136,7 @@
             <button onClick={onLogout}
               className="w-full py-2.5 rounded-xl border border-red-200 text-red-500 text-sm
                          font-medium hover:bg-red-50 transition-colors">
-              🚪 התנתקות
+              התנתקות
             </button>
           </div>
         </div>
@@ -2448,7 +2483,11 @@
                         ${syncStatus === 'syncing' ? 'bg-yellow-50 border-yellow-300 text-yellow-600' :
                           syncStatus === 'error'   ? 'bg-red-50 border-red-300 text-red-600' :
                           'bg-green-50 border-green-300 text-green-700 hover:bg-green-100'}`}>
-                      {syncStatus === 'syncing' ? '⏳' : syncStatus === 'error' ? '⚠️' : '☁️'}
+                      {syncStatus === 'syncing'
+                        ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                        : syncStatus === 'error'
+                        ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>}
                       {syncStatus === 'syncing' ? 'שומר...' : syncStatus === 'error' ? 'שגיאה' : 'שמור'}
                     </button>
                     <button
@@ -2476,7 +2515,8 @@
                       }}
                       title="טען מהענן"
                       className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors">
-                      🔄 טען
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+                      טען
                     </button>
                   </>
                 )}
@@ -2493,14 +2533,17 @@
                 {!adminMode ? (
                   <button onClick={openAdminMode}
                     className="text-sm text-gray-500 hover:text-gray-700 transition-colors px-2 py-1">
-                    ניהול 🔑
+                    כניסה לניהול
                   </button>
                 ) : (
                   <div className="relative">
                     <button onClick={() => setMenuOpen(v => !v)}
                       className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center
-                                 justify-center text-base transition-colors">
-                      ⚙️
+                                 justify-center transition-colors text-gray-600">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                      </svg>
                     </button>
                     {menuOpen && (
                       <>
@@ -2530,18 +2573,23 @@
           </header>
 
           {/* ── Filters ── */}
-          <div className="bg-white border-b border-gray-100">
+          <div className="bg-white border-b border-gray-200/80 shadow-sm">
             <div className="max-w-4xl mx-auto px-4 py-3 space-y-3">
 
               {/* חיפוש */}
               <div className="relative">
-                <input type="text" placeholder="🔍 חיפוש מוצר..."
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/>
+                  </svg>
+                </div>
+                <input type="text" placeholder="חיפוש מוצר..."
                   value={query} onChange={e => setQuery(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-gray-300" />
+                  className="w-full border border-gray-200 rounded-xl pr-9 pl-8 py-2.5 text-sm
+                             focus:outline-none focus:ring-2 focus:ring-gray-300 bg-gray-50 focus:bg-white transition-colors" />
                 {query && (
                   <button onClick={() => setQuery('')}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold">
                     ✕
                   </button>
                 )}
@@ -2565,7 +2613,7 @@
                     ${availOnly
                       ? 'bg-green-500 text-white border-green-500'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-green-400'}`}>
-                  <span className={`w-2.5 h-2.5 rounded-full ${availOnly ? 'bg-white' : 'bg-gray-300'}`} />
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${availOnly ? 'bg-white' : 'bg-gray-300'}`} />
                   זמין בלבד
                 </button>
                 <span className="text-xs text-gray-400">
@@ -2663,7 +2711,10 @@
                   className="flex-shrink-0 bg-[#25D366] hover:bg-[#20c05c] text-white px-5 py-3
                              rounded-xl font-bold text-sm flex items-center gap-2 shadow-md
                              transition-colors">
-                  📱 {adminMode ? 'שלח בוואטסאפ' : 'שלח לנו וואטסאפ'}
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/>
+                    </svg>
+                    {adminMode ? 'שלח בוואטסאפ' : 'שלח לנו וואטסאפ'}
                 </button>
               </div>
             </div>
@@ -2677,7 +2728,12 @@
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20
                             shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
               <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-center gap-3">
-                <p className="text-gray-400 text-sm">בחר מוצרים ולחץ "שלח לנו וואטסאפ"</p>
+                <div className="flex items-center gap-2 text-gray-400 text-sm">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  בחר מוצרים ושלח לנו וואטסאפ
+                </div>
               </div>
             </div>
           )}

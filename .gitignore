@@ -21,3 +21,5 @@ ww-session/
 # Secret files
 .env
 api-token.txt
+supabase-service-key.txt
+apps-script-url.txt

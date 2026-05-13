@@ -227,6 +227,7 @@
           warehouses:     cfg.warehouses     || [],
           whatsappNumber: cfg.whatsappNumber || '',
           serverURL:      cfg.serverURL      || '',
+          apiToken:       cfg.apiToken       || '',
           logoUrl:        cfg.logoUrl        || ''
         };
       } catch(e) {
@@ -451,20 +452,20 @@
     // ─────────────────────────────────────────
     function CategoryFilter({ active, onChange, categories = CATEGORIES, adminMode = false, onAddCategory = null }) {
       return (
-        <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           {categories.map(c => (
             <button key={c.key} onClick={() => onChange(c.key)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all
                 ${active === c.key
-                  ? 'bg-gray-900 text-white shadow-sm'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'}`}>
+                  ? 'bg-gray-900 text-white shadow-md scale-105'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-400 hover:bg-gray-50'}`}>
               {c.label}
             </button>
           ))}
           {adminMode && onAddCategory && (
             <button onClick={onAddCategory}
-              className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium bg-white text-gray-700
-                         border border-gray-300 hover:bg-gray-50 transition-colors whitespace-nowrap">
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-white text-gray-700
+                         border border-dashed border-gray-300 hover:bg-gray-50 transition-all whitespace-nowrap">
               ➕ קטגוריה
             </button>
           )}
@@ -715,22 +716,31 @@
       const [query,        setQuery]        = useState('');
       const [selected,     setSelected]     = useState(null);
       const [open,         setOpen]         = useState(false);
+      const [collapsed,    setCollapsed]    = useState(true);
       const [showSaveForm, setShowSaveForm] = useState(false);
       const [newName,      setNewName]      = useState('');
       const [saving,       setSaving]       = useState(false);
+      const wrapRef  = useRef();
       const inputRef = useRef();
 
       useEffect(() => { contactsLoad().then(setContacts); }, []);
 
-      // סגור dropdown בלחיצה מחוץ
       useEffect(() => {
         const handler = (e) => {
-          if (inputRef.current && !inputRef.current.closest('.cp-wrap').contains(e.target))
+          if (wrapRef.current && !wrapRef.current.contains(e.target)) {
             setOpen(false);
+            if (!selected) setCollapsed(true);
+          }
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
-      }, []);
+      }, [selected]);
+
+      const expand = () => {
+        setCollapsed(false);
+        setOpen(true);
+        setTimeout(() => inputRef.current && inputRef.current.focus(), 30);
+      };
 
       const digits = query.replace(/\D/g, '');
       const filtered = query.length > 0
@@ -745,11 +755,11 @@
       const alreadySaved = contacts.some(c => c.phone.replace(/\D/g,'') === query.replace(/\D/g,''));
 
       const select = (contact) => {
-        setSelected(contact); setQuery(''); setOpen(false); setShowSaveForm(false);
+        setSelected(contact); setQuery(''); setOpen(false); setShowSaveForm(false); setCollapsed(false);
         onSelect(contact.phone, contact.name);
       };
 
-      const clear = () => { setSelected(null); setQuery(''); onSelect('', ''); };
+      const clear = () => { setSelected(null); setQuery(''); setCollapsed(true); onSelect('', ''); };
 
       const saveNew = async () => {
         if (!newName.trim()) return;
@@ -762,7 +772,7 @@
       };
 
       return (
-        <div className="cp-wrap relative">
+        <div className="cp-wrap relative" ref={wrapRef}>
           {selected ? (
             <div className="flex items-center gap-3 border-2 border-green-400 bg-green-50
                             rounded-xl px-4 py-3">
@@ -779,19 +789,29 @@
                 ×
               </button>
             </div>
+          ) : collapsed ? (
+            <button onClick={expand}
+              className="w-full flex items-center justify-between border border-gray-200 rounded-xl
+                         px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#9ca3af"
+                   strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 6 8 10 12 6"/>
+              </svg>
+              <span className="text-gray-400 text-sm">בחר איש קשר...</span>
+            </button>
           ) : (
             <>
-              <div className="relative" ref={inputRef}>
+              <div className="relative">
                 <input
-                  autoFocus
+                  ref={inputRef}
                   type="text"
                   placeholder="חפש שם או הכנס מספר..."
                   value={query}
-                  onChange={e => { setQuery(e.target.value); setOpen(true); setSendError && setSendError(''); }}
+                  onChange={e => { setQuery(e.target.value); setOpen(true); }}
                   onFocus={() => setOpen(true)}
                   onKeyDown={e => {
                     if (e.key === 'Enter' && filtered.length === 1) select(filtered[0]);
-                    if (e.key === 'Escape') setOpen(false);
+                    if (e.key === 'Escape') { setOpen(false); if (!selected) setCollapsed(true); }
                   }}
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base
                              focus:outline-none focus:ring-2 focus:ring-green-300"
@@ -810,7 +830,6 @@
                                 rounded-xl shadow-xl z-30 max-h-52 overflow-y-auto">
                   {filtered.length > 0
                     ? filtered.map(c => {
-                      // הדגשת החלק שמתאים
                       const hi = (str, q) => {
                         if (!q) return str;
                         const idx = str.toLowerCase().indexOf(q.toLowerCase());
@@ -947,6 +966,25 @@
     // SERVER URL – saved in localStorage (synced from Supabase on load)
     const getToken  = () => localStorage.getItem('kshop_api_token') || '';
 
+    async function notifySync(product) {
+      const srv = (localStorage.getItem('kshop_server_url') || '').replace(/\/$/, '');
+      const tok = localStorage.getItem('kshop_api_token') || '';
+      if (!srv || !tok || !product.sku) return;
+      const wqty = getWqty(product);
+      try {
+        await fetch(srv + '/kshop-updated', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'x-kshop-token': tok, 'ngrok-skip-browser-warning': 'true' },
+          body:    JSON.stringify({
+            sku:     product.sku,
+            name:    product.name,
+            qty_old: wqty['alishma_old'] || 0,
+            qty_new: wqty['alishma_new'] || 0,
+          }),
+        });
+      } catch { /* שגיאת רשת — שקט */ }
+    }
+
     const getServer = () =>
       localStorage.getItem('kshop_server_url') ||
       (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -965,7 +1003,7 @@
       const [sendError,    setSendError]    = useState('');
       const [textCopied,   setTextCopied]   = useState(false);
 
-      const text = buildWhatsAppText(products);
+      const [text, setText] = useState(() => buildWhatsAppText(products));
       const businessNumber = localStorage.getItem('kshop_whatsapp_number') || '';
       const srv = getServer();
 
@@ -1069,11 +1107,15 @@
                   ))}
                 </div>
 
-                {/* טקסט preview */}
-                <div className="bg-[#dcf8c6] rounded-xl px-4 py-3 text-xs text-gray-700
-                                whitespace-pre-wrap leading-relaxed border border-green-200 max-h-32 overflow-y-auto">
-                  {text}
-                </div>
+                {/* טקסט לעריכה */}
+                <textarea
+                  value={text}
+                  onChange={e => setText(e.target.value)}
+                  rows={5}
+                  className="w-full bg-[#dcf8c6] rounded-xl px-4 py-3 text-xs text-gray-700
+                             leading-relaxed border border-green-200 resize-none
+                             focus:outline-none focus:ring-2 focus:ring-green-300"
+                />
 
                 {/* בחירת איש קשר */}
                 <ContactPickerWithAdd
@@ -1207,17 +1249,6 @@
 
       const set = (k, v) => setF(p => ({ ...p, [k]: v }));
 
-      const handleImage = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 3 * 1024 * 1024) {
-          alert('התמונה גדולה מדי (מעל 3MB). אנא דחס לפני ההעלאה.');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = ev => set('image', ev.target.result);
-        reader.readAsDataURL(file);
-      };
 
       const submit = (e) => {
         e.preventDefault();
@@ -1259,7 +1290,7 @@
 
               {/* תמונה */}
               <div>
-                <label className={labelCls}>תמונה</label>
+                <label className={labelCls}>קישור לתמונה</label>
                 {f.image && (
                   <div className="relative inline-block mb-2">
                     <img src={f.image} className="w-28 h-28 object-cover rounded-xl border border-gray-200" />
@@ -1268,8 +1299,10 @@
                                  w-5 h-5 text-xs flex items-center justify-center shadow">×</button>
                   </div>
                 )}
-                <input type="file" accept="image/*" onChange={handleImage} className="text-xs" />
-                <p className="text-xs text-gray-400 mt-0.5">מומלץ: פחות מ-1MB לביצועים טובים</p>
+                <input type="url" placeholder="https://example.com/image.jpg"
+                  value={f.image || ''} onChange={e => set('image', e.target.value)}
+                  className={inputCls} />
+                <p className="text-xs text-gray-400 mt-0.5">הדבק קישור לתמונה מהאתר שלך</p>
               </div>
 
               {/* שם */}
@@ -1594,7 +1627,22 @@
         buildCatalog();
         try {
           const el = document.getElementById('kshop-print-catalog');
-          const canvas = await window.html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#fff' });
+          // html2canvas needs a visible element — render off-screen
+          el.style.display = 'block';
+          el.style.position = 'fixed';
+          el.style.left = '-9999px';
+          el.style.top = '0';
+          el.style.width = '794px'; // A4 at 96dpi
+          let canvas;
+          try {
+            canvas = await window.html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#fff' });
+          } finally {
+            el.style.display = '';
+            el.style.position = '';
+            el.style.left = '';
+            el.style.top = '';
+            el.style.width = '';
+          }
           const { jsPDF } = window.jspdf;
           const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
           const imgData = canvas.toDataURL('image/jpeg', 0.92);
@@ -1713,13 +1761,8 @@
               {/* שליחה לוואטסאפ */}
               {showWaSend && !waDone && (
                 <div className="border border-green-200 bg-green-50 rounded-xl p-3 space-y-2">
-                  <p className="text-xs font-semibold text-green-700">📱 שלח PDF לוואטסאפ</p>
-                  <input type="tel" placeholder="מספר טלפון (0501234567)" value={waPhone}
-                    onChange={e => setWaPhone(e.target.value)}
-                    className="w-full border border-green-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
-                    dir="ltr" />
-                  {waError && <p className="text-xs text-red-500">{waError}</p>}
-                  <button onClick={sendToWA} disabled={sendingWA}
+                  <ContactPickerWithAdd onSelect={(num) => setWaPhone(num)} sendError={waError} />
+                  <button onClick={sendToWA} disabled={sendingWA || !waPhone.trim()}
                     className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2">
                     {sendingWA ? '⏳ שולח...' : '📤 שלח עכשיו'}
                   </button>
@@ -1767,6 +1810,15 @@
       const [addingC, setAddingC]     = useState(false);
       const [showContacts, setShowContacts] = useState(false);
       const [showWarehouses, setShowWarehouses] = useState(false);
+      const [showSync, setShowSync] = useState(false);
+      const [appsScriptUrl, setAppsScriptUrl] = useState(() => localStorage.getItem('kshop_apps_script_url') || '');
+      const [syncMsg, setSyncMsg] = useState('');
+      const [syncLog, setSyncLog] = useState([]);
+      const [syncing, setSyncing] = useState(false);
+      const [missingSkus, setMissingSkus] = useState(null);
+      const [loadingMissing, setLoadingMissing] = useState(false);
+      const [missingSearch, setMissingSearch] = useState('');
+      const [missingQtys, setMissingQtys] = useState({});
       const [newWhLabel, setNewWhLabel] = useState('');
       const importRef         = useRef();
 
@@ -1898,8 +1950,13 @@
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono
                            focus:outline-none focus:ring-2 focus:ring-red-300"
               />
-              <button onClick={() => {
-                localStorage.setItem('kshop_api_token', apiToken.trim());
+              <button onClick={async () => {
+                const t = apiToken.trim();
+                localStorage.setItem('kshop_api_token', t);
+                const { data: { session } } = await db.auth.getSession();
+                if (session) {
+                  await db.from('app_settings').upsert({ key: 'apiToken', value: JSON.stringify(t) }, { onConflict: 'key' });
+                }
                 setMsg('✅ Token נשמר!');
                 setTimeout(() => setMsg(''), 2500);
               }}
@@ -2112,6 +2169,216 @@
               )}
             </div>
 
+            <hr className="my-4 border-gray-100" />
+
+            {/* Google Sheets סנכרון */}
+            <div className="mb-2">
+              <button onClick={() => setShowSync(v => !v)}
+                className="w-full flex items-center justify-between text-sm font-semibold text-gray-700 py-2">
+                <span>📊 סנכרון Google Sheets</span>
+                <span className="text-gray-400 text-xs">{showSync ? '▲' : '▼'}</span>
+              </button>
+
+              {showSync && (
+                <div className="mt-2 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Apps Script URL</label>
+                    <input value={appsScriptUrl} onChange={e => setAppsScriptUrl(e.target.value)}
+                      placeholder="https://script.google.com/macros/s/..."
+                      dir="ltr"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono
+                                 focus:outline-none focus:ring-2 focus:ring-gray-400" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => {
+                      localStorage.setItem('kshop_apps_script_url', appsScriptUrl.trim());
+                      setSyncMsg('✅ URL נשמר');
+                      setTimeout(() => setSyncMsg(''), 2000);
+                    }} className="flex-1 py-2 bg-gray-100 text-gray-800 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors">
+                      שמור URL
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={syncing} onClick={async () => {
+                      const srv = (localStorage.getItem('kshop_server_url') || '').replace(/\/$/, '');
+                      const tok = localStorage.getItem('kshop_api_token') || '';
+                      if (!srv || !tok) { setSyncMsg('❌ הגדר כתובת שרת וטוקן קודם'); return; }
+                      setSyncing(true); setSyncMsg('מייבא מ-Sheets...');
+                      try {
+                        const r = await fetch(srv + '/sheets-import', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-kshop-token': tok, 'ngrok-skip-browser-warning': 'true' },
+                          body: JSON.stringify({ apps_script_url: appsScriptUrl.trim() })
+                        });
+                        const d = await r.json();
+                        setSyncMsg(d.success ? `✅ יובאו ${d.updated} מוצרים (${d.skipped} דולגו, ${d.notFound} לא נמצאו)` : '❌ ' + (d.error || 'שגיאה'));
+                      } catch { setSyncMsg('❌ שרת לא נגיש'); }
+                      finally { setSyncing(false); }
+                    }} className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                      {syncing ? 'מייבא...' : '⬇️ ייבוא מ-Sheets'}
+                    </button>
+                    <button type="button" disabled={syncing} onClick={async () => {
+                      const srv = (localStorage.getItem('kshop_server_url') || '').replace(/\/$/, '');
+                      const tok = localStorage.getItem('kshop_api_token') || '';
+                      if (!srv || !tok) { setSyncMsg('❌ הגדר כתובת שרת וטוקן קודם'); return; }
+                      setSyncing(true); setSyncMsg('מעלה ל-Sheets...');
+                      try {
+                        const r = await fetch(srv + '/sheets-full-sync', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-kshop-token': tok, 'ngrok-skip-browser-warning': 'true' },
+                          body: JSON.stringify({ apps_script_url: appsScriptUrl.trim() })
+                        });
+                        const d = await r.json();
+                        setSyncMsg(d.success ? `✅ הועלו ${d.synced} מק"טים` : '❌ ' + (d.error || 'שגיאה'));
+                      } catch { setSyncMsg('❌ שרת לא נגיש'); }
+                      finally { setSyncing(false); }
+                    }} className="flex-1 py-2 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors">
+                      {syncing ? 'מעלה...' : '⬆️ העלה ל-Sheets'}
+                    </button>
+                  </div>
+                  {syncMsg && <p className="text-sm">{syncMsg}</p>}
+                  <button type="button" onClick={async () => {
+                    const srv = (localStorage.getItem('kshop_server_url') || '').replace(/\/$/, '');
+                    const tok = localStorage.getItem('kshop_api_token') || '';
+                    if (!srv || !tok) return;
+                    try {
+                      const r = await fetch(srv + '/sheets-status', { headers: { 'x-kshop-token': tok, 'ngrok-skip-browser-warning': 'true' } });
+                      const d = await r.json();
+                      setSyncLog(d.log || []);
+                    } catch {}
+                  }} className="w-full text-xs text-gray-400 hover:text-gray-600 text-right transition-colors">
+                    🔄 טען לוג סנכרון
+                  </button>
+                  {syncLog.length > 0 && (
+                    <div className="bg-gray-50 rounded-xl p-3 space-y-1 max-h-32 overflow-y-auto">
+                      {[...syncLog].reverse().slice(0, 8).map((entry, i) => (
+                        <p key={i} className="text-xs font-mono text-gray-500 leading-tight" dir="ltr">{entry}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  <button type="button" disabled={loadingMissing} onClick={async () => {
+                    const srv = (localStorage.getItem('kshop_server_url') || '').replace(/\/$/, '');
+                    const tok = localStorage.getItem('kshop_api_token') || '';
+                    if (!srv || !tok) return;
+                    setLoadingMissing(true); setMissingSkus(null);
+                    try {
+                      const r = await fetch(srv + '/sheets-missing', { headers: { 'x-kshop-token': tok, 'ngrok-skip-browser-warning': 'true' } });
+                      const d = await r.json();
+                      setMissingSkus(d);
+                    } catch { setMissingSkus({ error: 'שרת לא נגיש' }); }
+                    finally { setLoadingMissing(false); }
+                  }} className="w-full py-2 border border-orange-200 text-orange-600 rounded-xl text-sm font-medium hover:bg-orange-50 disabled:opacity-50 transition-colors">
+                    {loadingMissing ? 'טוען...' : '🔍 מק"טים חסרים ב-KShop'}
+                  </button>
+
+                  {missingSkus && !missingSkus.error && (() => {
+                    const getQty = (sku, field, fallback) =>
+                      missingQtys[sku] !== undefined ? missingQtys[sku][field] : fallback;
+
+                    const changeQty = async (item, field, delta) => {
+                      const oldVal = getQty(item.sku, 'qty_old', item.qty_old);
+                      const newVal = getQty(item.sku, 'qty_new', item.qty_new);
+                      const updated = {
+                        qty_old: field === 'qty_old' ? Math.max(0, oldVal + delta) : oldVal,
+                        qty_new: field === 'qty_new' ? Math.max(0, newVal + delta) : newVal,
+                      };
+                      setMissingQtys(prev => ({ ...prev, [item.sku]: updated }));
+                      const srv = (localStorage.getItem('kshop_server_url') || '').replace(/\/$/, '');
+                      const tok = localStorage.getItem('kshop_api_token') || '';
+                      if (!srv || !tok) return;
+                      try {
+                        fetch(srv + '/kshop-updated', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-kshop-token': tok, 'ngrok-skip-browser-warning': 'true' },
+                          body: JSON.stringify({ sku: item.sku, name: item.name, ...updated })
+                        });
+                      } catch {}
+                    };
+
+                    const filtered = missingSkus.missing.filter(item =>
+                      !missingSearch ||
+                      item.sku.toLowerCase().includes(missingSearch.toLowerCase()) ||
+                      item.name.toLowerCase().includes(missingSearch.toLowerCase())
+                    );
+
+                    return (
+                      <div className="rounded-xl border border-orange-200 overflow-hidden">
+                        {/* כותרת */}
+                        <div className="bg-orange-50 px-3 py-2 flex items-center justify-between">
+                          {missingSkus.missing.length === 0 ? (
+                            <span className="text-xs font-semibold text-green-700">✅ כל המק"טים קיימים ב-KShop</span>
+                          ) : (
+                            <span className="text-xs font-semibold text-orange-700">{missingSkus.missing.length} מק"טים חסרים</span>
+                          )}
+                          {missingSkus.missing.length > 0 && (
+                            <span className="text-xs text-orange-500">
+                              סה"כ {missingSkus.missing.reduce((a,b) => a + getQty(b.sku,'qty_old',b.qty_old) + getQty(b.sku,'qty_new',b.qty_new), 0)} יחידות
+                            </span>
+                          )}
+                        </div>
+
+                        {missingSkus.missing.length > 0 && (
+                          <>
+                            {/* חיפוש */}
+                            <div className="px-3 py-2 border-b border-orange-100 bg-white">
+                              <input
+                                type="text"
+                                placeholder="חיפוש לפי מקט או שם..."
+                                value={missingSearch}
+                                onChange={e => setMissingSearch(e.target.value)}
+                                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5
+                                           focus:outline-none focus:ring-2 focus:ring-orange-300"
+                              />
+                            </div>
+
+                            {/* שורות */}
+                            <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
+                              {filtered.length === 0 && (
+                                <p className="text-xs text-gray-400 text-center py-4">אין תוצאות</p>
+                              )}
+                              {filtered.map((item) => {
+                                const qo = getQty(item.sku, 'qty_old', item.qty_old);
+                                const qn = getQty(item.sku, 'qty_new', item.qty_new);
+                                const btnCls = "w-6 h-6 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-sm flex items-center justify-center transition-colors flex-shrink-0";
+                                return (
+                                  <div key={item.sku} className="px-3 py-2.5 hover:bg-orange-50 transition-colors">
+                                    <div className="mb-1.5">
+                                      <span className="text-[11px] font-mono font-bold text-orange-600">{item.sku}</span>
+                                      <p className="text-sm text-gray-800 leading-snug">{item.name || '—'}</p>
+                                    </div>
+                                    <div className="flex gap-3">
+                                      {/* ישן */}
+                                      <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2 py-1">
+                                        <span className="text-[10px] text-gray-400 w-6">ישן</span>
+                                        <button onClick={() => changeQty(item, 'qty_old', -1)} className={btnCls}>−</button>
+                                        <span className={`text-sm font-bold w-6 text-center ${qo > 0 ? 'text-gray-800' : 'text-gray-300'}`}>{qo}</span>
+                                        <button onClick={() => changeQty(item, 'qty_old', +1)} className={btnCls}>+</button>
+                                      </div>
+                                      {/* חדש */}
+                                      <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2 py-1">
+                                        <span className="text-[10px] text-gray-400 w-6">חדש</span>
+                                        <button onClick={() => changeQty(item, 'qty_new', -1)} className={btnCls}>−</button>
+                                        <span className={`text-sm font-bold w-6 text-center ${qn > 0 ? 'text-gray-800' : 'text-gray-300'}`}>{qn}</span>
+                                        <button onClick={() => changeQty(item, 'qty_new', +1)} className={btnCls}>+</button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {missingSkus && missingSkus.error && (
+                    <p className="text-xs text-red-500">{missingSkus.error}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* שינוי סיסמה */}
             <form onSubmit={changePw} className="space-y-3">
               <p className="text-sm font-medium text-gray-700">שינוי סיסמה</p>
@@ -2205,7 +2472,14 @@
 
       // פונקציה לטעינת נתוני ענן ועדכון state
       const applyCloudData = (data) => {
-        if (data && data.products && data.products.length > 0) {
+        if (!data) return;
+        // הגדרות — תמיד, גם אם אין מוצרים
+        if (data.serverURL)      localStorage.setItem('kshop_server_url',      data.serverURL);
+        if (data.apiToken)       localStorage.setItem('kshop_api_token',       data.apiToken);
+        if (data.whatsappNumber) localStorage.setItem('kshop_whatsapp_number', data.whatsappNumber);
+        if (data.logoUrl)        setLogoUrl(data.logoUrl);
+        // מוצרים וקטגוריות
+        if (data.products && data.products.length > 0) {
           setProducts(data.products);
           persistProducts(data.products);
           const cloudCats = data.categories && data.categories.length > 0 ? data.categories : CATEGORIES;
@@ -2214,8 +2488,6 @@
           const cloudWhs = data.warehouses && data.warehouses.length > 0 ? data.warehouses : DEFAULT_WAREHOUSES;
           setWarehouses(cloudWhs);
           localStorage.setItem('kshop_warehouses', JSON.stringify(cloudWhs));
-          if (data.whatsappNumber) localStorage.setItem('kshop_whatsapp_number', data.whatsappNumber);
-          if (data.logoUrl) setLogoUrl(data.logoUrl);
         }
       };
 
@@ -2254,6 +2526,21 @@
 
         return () => subscription.unsubscribe();
       }, []);
+
+      // ── Supabase Realtime — מתרענן כשSheets מעדכן מוצר ──────
+      useEffect(() => {
+        if (!loggedIn) return;
+        const channel = db
+          .channel('products-sync')
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products' },
+            (payload) => {
+              setProducts(prev => prev.map(p =>
+                p.id === payload.new.id ? { ...p, ...payload.new } : p
+              ));
+            })
+          .subscribe();
+        return () => db.removeChannel(channel);
+      }, [loggedIn]);
 
       const save = (list) => { setProducts(list); persistProducts(list); debouncedCloudSave(list); };
 
@@ -2339,6 +2626,7 @@
         save(exists ? products.map(p => p.id === form.id ? form : p) : [...products, form]);
         setShowForm(false); setEditProduct(null);
         showToast(exists ? 'מוצר עודכן' : 'מוצר נוסף');
+        notifySync(form);
       };
 
       const handleDelete = (id) => {
@@ -2350,16 +2638,20 @@
       };
 
       const handleQuantityChange = (id, delta, warehouseKey = null) => {
+        let updated;
         save(products.map(p => {
           if (p.id !== id) return p;
           const newTotal = Math.max(0, (p.quantity || 0) + delta);
           if (warehouseKey) {
             const wqty = getWqty(p);
             const newWqty = { ...wqty, [warehouseKey]: Math.max(0, (wqty[warehouseKey] || 0) + delta) };
-            return { ...p, quantity: newTotal, warehouse_qty: JSON.stringify(newWqty) };
+            updated = { ...p, quantity: newTotal, warehouse_qty: JSON.stringify(newWqty) };
+            return updated;
           }
-          return { ...p, quantity: newTotal };
+          updated = { ...p, quantity: newTotal };
+          return updated;
         }));
+        if (updated) notifySync(updated);
       };
 
       const openEdit = (product) => { setEditProduct(product); setShowForm(true); };
